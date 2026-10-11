@@ -119,6 +119,7 @@ CREATE TABLE PURCHASE_items (
     purchase_item_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     purchase_id INT UNSIGNED NOT NULL,
     product_id INT UNSIGNED NOT NULL,
+    tag_id INT UNSIGNED NULL,
     unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 
@@ -135,6 +136,12 @@ CREATE TABLE PURCHASE_items (
     CONSTRAINT fk_purchase_item_product
         FOREIGN KEY (product_id)
         REFERENCES PRODUCTtbl(product_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_purchase_item_tag
+        FOREIGN KEY (tag_id)
+        REFERENCES RFID_tags(tag_id)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
 );
