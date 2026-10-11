@@ -241,8 +241,9 @@
   <div class="fg"><label>Current stock</label><input id="epc-stock" readonly></div>
   <div class="fg"><label>Price</label><input id="epc-price" readonly></div>
   <div class="fg"><label>EPC code</label><input id="epc-code" readonly placeholder="Waiting for scan…"></div>
+  <div id="epc-captured" class="hint" style="max-height:105px;overflow-y:auto;overflow-wrap:anywhere;margin:8px 0">No EPCs captured yet.</div>
   <div class="err" id="ee"></div>
-  <div class="mfoot"><button class="btn ghost" data-close="m-epc">Close</button><button class="btn" id="epc-arm" type="button">Start Scan</button></div>
+  <div class="mfoot"><button class="btn ghost" data-close="m-epc">Close</button><button class="btn ghost" id="epc-clear" type="button">Clear</button><button class="btn" id="epc-arm" type="button">Start Scanning</button></div>
 </div></div>
 
 <!-- KIOSK -->

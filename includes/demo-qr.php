@@ -17,3 +17,19 @@ function quickmart_demo_qr_outcome(string $payload): string
         default => 'invalid',
     };
 }
+
+/**
+ * Localhost classroom demo ONLY; never treat a QR as verified bank payment.
+ * Default local development works without Apache environment-variable setup.
+ */
+function quickmart_local_demo_allowed(
+    string $remoteIp,
+    string $host,
+    string|false $appEnv,
+    string|false $demoOverride
+): bool {
+    return in_array($remoteIp, ['127.0.0.1', '::1'], true)
+        && preg_match('/\\A(?:localhost|127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]{1,5})?\\z/i', $host) === 1
+        && $appEnv !== 'production'
+        && $demoOverride !== '0';
+}

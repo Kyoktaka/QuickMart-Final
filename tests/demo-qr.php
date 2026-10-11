@@ -24,3 +24,21 @@ if (quickmart_demo_qr_outcome('  QMPAY|QM-WALLET-1001|C899  ') !== 'success') {
     exit(1);
 }
 echo '9 fixed demo QR test cases passed.' . PHP_EOL;
+
+$hostCases = [
+    ['127.0.0.1','localhost',false,false,true],
+    ['::1','[::1]:80',false,false,true],
+    ['127.0.0.1','127.0.0.1:8080',false,false,true],
+    ['127.0.0.1','localhost','production',false,false],
+    ['127.0.0.1','localhost',false,'0',false],
+    ['192.168.1.20','localhost',false,false,false],
+    ['127.0.0.1','quickmart.example.com',false,false,false],
+    ['127.0.0.1','localhost.attacker.example',false,false,false],
+];
+foreach ($hostCases as [$ip,$host,$env,$opt,$expected]) {
+    if (quickmart_local_demo_allowed($ip,$host,$env,$opt) !== $expected) {
+        fwrite(STDERR, "Demo localhost gate failed for $ip / $host\n");
+        exit(1);
+    }
+}
+echo '8 local payment-gate tests passed.' . PHP_EOL;

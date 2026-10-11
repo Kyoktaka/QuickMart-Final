@@ -1,5 +1,5 @@
 /* ===== SELF-CHECKOUT: SERVER-VALIDATED EPCs AND DEMO QR ===== */
-let timerId=null,left=TIMEOUT,trayRevision=0;
+let timerId=null,left=TIMEOUT,trayRevision=0,emptyTrayTimer=null;
 const loggedSessions=new Set();
 const cartTotal=()=>state.cart.reduce((n,i)=>n+i.price*i.qty,0);
 const cartQty=()=>state.cart.reduce((n,i)=>n+i.qty,0);
@@ -48,6 +48,7 @@ async function finalize(status,reason){
   }catch(e){toast('Could not record checkout attempt: '+e.message)}
 }
 function resetKiosk(){
+  clearTimeout(emptyTrayTimer);emptyTrayTimer=null;
   stopTimer();stopCameraScanner();trayRevision++;
   state.cart=[];state.current=null;state.processing=false;
   $('#assist-banner').classList.remove('on');$('#btn-assist').disabled=false;
@@ -74,7 +75,18 @@ window.addEventListener('rfid:tray',async e=>{
   if(window.RFIDScanner&&!RFIDScanner.isEnabled())return;
   const epcs=[...new Set((e.detail||[]).map(v=>String(v).trim().toUpperCase()))];
   const revision=++trayRevision;
-  if(!epcs.length){state.cart=[];state.current=null;renderCart();screen('k-idle');return}
+  clearTimeout(emptyTrayTimer);emptyTrayTimer=null;
+  if(!epcs.length){
+    // Confirm absence before clearing the cart. RFID missed reads are common
+    // when several tags are close together. A new read cancels this removal.
+    emptyTrayTimer=setTimeout(()=>{
+      if(revision!==trayRevision||!state.kioskOn||
+         !window.RFIDScanner?.isEnabled()||
+         window.RFIDScanner.getPresentEpcs().length)return;
+      state.cart=[];state.current=null;renderCart();screen('k-idle');
+    },1200);
+    return;
+  }
   try{
     const result=await Backend.detect(epcs);
     if(revision!==trayRevision||!state.kioskOn)return;

@@ -16,3 +16,5 @@ jobs:
         run: php tests/demo-qr.php
       - name: RFID presence and scan regression tests
         run: node tests/rfid-scanner.js
+      - name: Multi-tag restocking and product isolation tests
+        run: node tests/inventory-batch.js
