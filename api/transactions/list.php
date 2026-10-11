@@ -22,6 +22,23 @@ try {
         ORDER BY p.purchase_date DESC, p.purchase_id DESC
     ");
 
+    // Fetch receipt details for successful purchases; EPCs are not stored in PURCHASE_items.
+    $detailStmt = $conn->query("
+        SELECT pi.purchase_id, pi.product_id, p.product_name, pi.unit_price
+        FROM PURCHASE_items AS pi
+        INNER JOIN PRODUCTtbl AS p ON p.product_id = pi.product_id
+        ORDER BY pi.purchase_item_id ASC
+    ");
+    $receiptItems = [];
+    foreach ($detailStmt->fetchAll() as $item) {
+        $receiptItems[(int) $item['purchase_id']][] = [
+            'epc' => null,
+            'name' => $item['product_name'],
+            'qty' => 1,
+            'price' => (float) $item['unit_price']
+        ];
+    }
+
     $transactions = [];
     foreach ($stmt->fetchAll() as $row) {
         $successful = $row['status'] === 'SUCCESSFUL';
@@ -30,6 +47,7 @@ try {
             'date' => str_replace(' ', 'T', (string) $row['purchase_date']),
             'items' => $successful ? (int) $row['purchased_items'] : (int) $row['attempted_items'],
             'amount' => (float) $row['total_amount'],
+            'itemsDetail' => $successful ? ($receiptItems[(int) $row['purchase_id']] ?? []) : [],
             'status' => $successful ? 'success' :
                 ($row['attempt_status'] === 'cancelled' ? 'cancelled' : 'failed')
         ];

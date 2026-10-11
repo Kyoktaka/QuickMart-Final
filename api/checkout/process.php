@@ -21,6 +21,20 @@ if (!$demoEnabled) {
 }
 
 $data = read_json_body();
+// Local DEMO QR check. Not real cryptographic or payment-provider validation.
+$demoQr = is_string($data['payment_qr'] ?? null) ? trim($data['payment_qr']) : '';
+$qrParts = explode('|', $demoQr);
+if (count($qrParts) !== 3 || $qrParts[0] !== 'QMPAY'
+    || preg_match('/^[A-Za-z0-9_-]{1,30}$/D', $qrParts[1]) !== 1) {
+    json_response(['success' => false, 'message' => 'Invalid demonstration QR.'], 422);
+}
+$checkSum = 0;
+foreach (str_split($qrParts[1]) as $character) {
+    $checkSum += ord($character);
+}
+if ($qrParts[2] !== 'C' . ($checkSum % 997)) {
+    json_response(['success' => false, 'message' => 'Invalid demo QR checksum.'], 422);
+}
 $sessionId = $data['session_id'] ?? null;
 $input = $data['epcs'] ?? null;
 

@@ -8,6 +8,7 @@ USE rfid_checkout_main;
 CREATE TABLE PRODUCTtbl (
     product_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     product_name VARCHAR(150) NOT NULL,
+    description TEXT NULL,
     unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     category VARCHAR(100) NOT NULL DEFAULT 'General',
     size VARCHAR(50) NULL,

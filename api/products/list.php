@@ -5,6 +5,10 @@ require_once __DIR__ . '/../../config/bootstrap.php';
 require_once __DIR__ . '/../../config/database.php';
 require_manager();
 
+// Inventory can request inactive rows; standard callers still receive active products.
+$includeInactive = ($_GET['include_inactive'] ?? '') === '1';
+$filter = $includeInactive ? '' : 'WHERE p.status = 1';
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     header('Allow: GET');
     json_response(['success' => false, 'message' => 'Only GET requests are allowed.'], 405);
@@ -13,7 +17,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 try {
     // Physical available inventory is the number of AVAILABLE EPCs per active product.
     $stmt = $conn->query("
-        SELECT p.product_id, p.product_name, p.unit_price, p.category, p.size, p.status,
+        SELECT p.product_id, p.product_name, p.description, p.unit_price, p.category, p.size, p.status,
                COALESCE(stock.stock_available, 0) AS stock_available
         FROM PRODUCTtbl AS p
         LEFT JOIN (
@@ -22,7 +26,7 @@ try {
             WHERE status = 'AVAILABLE'
             GROUP BY product_id
         ) AS stock ON stock.product_id = p.product_id
-        WHERE p.status = 1
+        {$filter}
         ORDER BY p.product_id DESC
     ");
 

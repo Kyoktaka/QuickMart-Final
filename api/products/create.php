@@ -10,6 +10,7 @@ require_post();
 $data = read_json_body();
 
 $productName = trim((string)($data['product_name'] ?? ''));
+$description = is_string($data['description'] ?? null) ? trim($data['description']) : '';
 $category = trim((string)($data['category'] ?? 'General'));
 $price = $data['unit_price'] ?? $data['price'] ?? null;
 $size = trim((string)($data['size'] ?? ''));
@@ -30,6 +31,10 @@ if (!is_numeric($price) || !is_finite((float)$price) || (float)$price < 0 || (fl
 
 if ($category === '') {
     $category = 'General';
+}
+
+if (strlen($description) > 5000) {
+    json_response(['success' => false, 'message' => 'Description is too long.'], 422);
 }
 
 if (strlen($productName) > 150) {
@@ -55,12 +60,13 @@ if (strlen($category) > 100) {
 
 try {
     $stmt = $conn->prepare("
-        INSERT INTO PRODUCTtbl (product_name, unit_price, size, category)
-        VALUES (:product_name, :unit_price, :size, :category)
+        INSERT INTO PRODUCTtbl (product_name, description, unit_price, size, category)
+        VALUES (:product_name, :description, :unit_price, :size, :category)
     ");
 
     $stmt->execute([
         ':product_name' => $productName,
+        ':description' => $description,
         ':unit_price' => $price,
         ':size' => $size === '' ? null : $size,
         ':category' => $category
@@ -77,6 +83,7 @@ try {
             'product_id' => $productId,
             'formatted_product_id' => $formattedProductId,
             'product_name' => $productName,
+            'description' => $description,
             'unit_price' => (float)$price,
             'category' => $category,
             'size' => $size,

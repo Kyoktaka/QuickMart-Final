@@ -16,6 +16,7 @@ $productId = filter_var(
 );
 
 $productName = trim((string)($data['product_name'] ?? ''));
+$description = is_string($data['description'] ?? null) ? trim($data['description']) : '';
 $unitPrice = $data['unit_price'] ?? $data['price'] ?? null;
 $category = trim((string)($data['category'] ?? 'General'));
 $size = trim((string)($data['size'] ?? ''));
@@ -50,6 +51,10 @@ if ($category === '') {
     $category = 'General';
 }
 
+if (strlen($description) > 5000) {
+    json_response(['success' => false, 'message' => 'Description is too long.'], 422);
+}
+
 if (
     strlen($productName) > 150 ||
     strlen($category) > 100 ||
@@ -82,6 +87,7 @@ try {
     $stmt = $conn->prepare("
         UPDATE PRODUCTtbl
         SET product_name = :product_name,
+            description = :description,
             unit_price = :unit_price,
             category = :category,
             size = :size
@@ -90,6 +96,7 @@ try {
 
     $stmt->execute([
         ':product_name' => $productName,
+        ':description' => $description,
         ':unit_price' => $unitPrice,
         ':category' => $category,
         ':size' => $size === '' ? null : $size,
