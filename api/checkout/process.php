@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../config/bootstrap.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/demo-qr.php';
 
 require_scan_authorized();
 require_post();
@@ -21,19 +22,15 @@ if (!$demoEnabled) {
 }
 
 $data = read_json_body();
-// Local DEMO QR check. Not real cryptographic or payment-provider validation.
-$demoQr = is_string($data['payment_qr'] ?? null) ? trim($data['payment_qr']) : '';
-$qrParts = explode('|', $demoQr);
-if (count($qrParts) !== 3 || $qrParts[0] !== 'QMPAY'
-    || preg_match('/^[A-Za-z0-9_-]{1,30}$/D', $qrParts[1]) !== 1) {
-    json_response(['success' => false, 'message' => 'Invalid demonstration QR.'], 422);
-}
-$checkSum = 0;
-foreach (str_split($qrParts[1]) as $character) {
-    $checkSum += ord($character);
-}
-if ($qrParts[2] !== 'C' . ($checkSum % 997)) {
-    json_response(['success' => false, 'message' => 'Invalid demo QR checksum.'], 422);
+// Only two classroom QR fixtures are recognized. QR text is not real payment proof.
+$demoQr = is_string($data['payment_qr'] ?? null) ? $data['payment_qr'] : '';
+$demoOutcome = quickmart_demo_qr_outcome($demoQr);
+if ($demoOutcome === 'invalid') {
+    json_response([
+        'success' => false,
+        'code' => 'INVALID_DEMO_QR',
+        'message' => 'Unrecognized QuickMart demo QR code.'
+    ], 422);
 }
 $sessionId = $data['session_id'] ?? null;
 $input = $data['epcs'] ?? null;
@@ -56,7 +53,18 @@ foreach ($input as $value) {
     }
     $unique[$epc] = true;
 }
-$epcs = array_keys($unique); 
+$epcs = array_keys($unique);
+
+// This is a fixed classroom scenario, not a real wallet balance check.
+// A declined demo QR cannot create a successful purchase or update any RFID tag.
+// The frontend records the failed attempt separately through api/checkout/log.php.
+if ($demoOutcome === 'insufficient_balance') {
+    json_response([
+        'success' => false,
+        'code' => 'DEMO_INSUFFICIENT_BALANCE',
+        'message' => 'Insufficient balance (simulated wallet).'
+    ], 422);
+}
 
 try {
     $conn->beginTransaction();
@@ -144,6 +152,7 @@ try {
         'success' => true,
         'message' => 'Demo checkout completed. No real payment was verified.',
         'demo_mode' => true,
+        'demo_wallet' => 'QM-WALLET-1001',
         'session_id' => $sessionId,
         'purchase_id' => $purchaseId,
         'total_items' => count($items),

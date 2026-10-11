@@ -36,10 +36,20 @@ responds HTTP 503 and will not mark tags purchased.
 For school demo on local server only, configure PHP/Apache:
   QUICKMART_APP_ENV=development
   QUICKMART_DEMO_CHECKOUT=1
-Restart Apache and use QR text:
-  QMPAY|DEMO|C293
-The QR checksum is not a real payment signature. No balance, banking or
-real payment status is verified. This must never be enabled publicly.
+Restart Apache, then test the two fixed teammate QR codes:
+  QMPAY|QM-WALLET-1001|C899   => demo success (enough balance scenario)
+  QMPAY|QM-WALLET-1002|C900   => demo failure (insufficient balance scenario)
+These two scenarios are hardcoded SERVER-SIDE in includes/demo-qr.php.
+There is NO wallet database table, balance lookup, or wallet deduction.
+Successful demo checkouts update PURCHASEtbl/PURCHASE_items/RFID_tags.
+Declines leave RFID tags AVAILABLE; the frontend records a failed attempt
+in the existing PURCHASEtbl through api/checkout/log.php.
+Unrecognized QR codes are also treated as failed attempts in this demo.
+The old QMPAY|DEMO|C293 fixture is no longer accepted.
+
+A classroom QR is not a real payment method or fraud-resistant signature.
+Always leave demo mode disabled except for local school testing.
+No new database migration or ERD change is required for this option.
 
 ## Transaction History and Dashboard
 
