@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickMart – Self-Checkout & RFID Management</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/animations.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/purchase-history.css">
+<link rel="stylesheet" href="css/modals.css">
+<link rel="stylesheet" href="css/login.css">
+<link rel="stylesheet" href="css/kiosk.css">
+<link rel="stylesheet" href="css/toast-camera.css">
+<link rel="stylesheet" href="css/responsive.css">
+<link rel="stylesheet" href="css/transaction-history.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/inventory.css">
+<link rel="stylesheet" href="css/history-receipt.css">
+<link rel="stylesheet" href="css/kiosk-welcome.css">
+<link rel="stylesheet" href="css/login-background.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <svg viewBox="0 0 40 36" width="40" height="36" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6l5 20h19l4-14H11"/><path d="M17 11v8M22 11v8M27 11v8"/><circle cx="16" cy="30" r="2.5"/><circle cx="30" cy="30" r="2.5"/></svg>
+    <span class="bn">QuickMart</span>
+  </div>
+  <nav id="nav">
+    <button class="active" data-tab="dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="nl">Dashboard</span></button>
+    <button data-tab="history"><svg viewBox="0 0 24 24"><path d="M3 6l2 2 3-3M3 13l2 2 3-3M3 20l2 2 3-3M11 6h10M11 13h10M11 20h10"/></svg><span class="nl">Transaction History</span></button>
+    <button data-tab="inventory"><svg viewBox="0 0 24 24"><rect x="3" y="12" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><circle cx="7" cy="7" r="4"/><circle cx="17" cy="17" r="4"/></svg><span class="nl">Inventory</span></button>
+    <button data-tab="scan"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg><span class="nl">Product Recognition</span></button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user">
+      <div class="avatar"><svg viewBox="0 0 40 40"><circle cx="20" cy="15" r="7" fill="#7a4a2e"/><path d="M6 40c0-9 6-14 14-14s14 5 14 14z" fill="#2f80ed"/></svg></div>
+      <div><div class="user-name" id="user-name">Manager</div><div class="user-role">Store Manager</div></div>
+    </div>
+    <button class="logout-btn" id="btn-logout"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="nl">Logout</span></button>
+  </div>
+</aside>
+
+<main>
+<!-- TAB 1: DASHBOARD -->
+<section id="tab-dashboard" class="tab active dash">
+  <div class="head"><div><h1>Dashboard</h1><p class="welcome" id="welcome-msg">Welcome back!</p></div><div class="clock" data-clock></div></div>
+  <section class="stats">
+    <article class="stat"><div><span class="stat-label">Total Products</span><strong id="stat-products">0</strong></div><span class="stat-icon bg-orange"><svg viewBox="0 0 24 24"><path d="M2 3h3l3 12h11l2-8H6"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg></span></article>
+    <article class="stat"><div><span class="stat-label">Low Stock Items</span><strong id="stat-low">0</strong></div><span class="stat-icon bg-red"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h6"/></svg></span></article>
+    <article class="stat"><div><span class="stat-label">Today's Transaction</span><strong id="stat-trx">0</strong></div><span class="stat-icon bg-green"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h8M4 18h6M17 20v-8M14 15l3-3 3 3"/></svg></span></article>
+    <article class="stat"><div><span class="stat-label">Total Sales (Today)</span><strong id="stat-sales">₱0.00</strong></div><span class="stat-icon bg-green"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 18V7h4a3 3 0 0 1 0 6H9M8 10h7"/></svg></span></article>
+  </section>
+  <section class="panels">
+    <article class="panel">
+      <div class="panel-head"><h2>Sales Overview</h2>
+        <div class="seg" id="range"><button class="on" data-r="daily">Daily</button><button data-r="weekly">Weekly</button></div></div>
+      <div class="chartbox"><canvas id="salesChart"></canvas></div>
+    </article>
+    <article class="panel">
+      <div class="panel-head"><h2>Recent Activities</h2><span class="view-all" data-goto="history" role="link" tabindex="0">View All</span></div>
+      <ul class="feed activity-list" id="activity-feed"></ul>
+    </article>
+  </section>
+</section>
+
+<!-- TAB 2: TRANSACTION HISTORY (completed & cancelled) -->
+<section id="tab-history" class="tab">
+  <div class="head"><div><h1>Transaction History</h1><p class="sub">View all completed and cancelled transactions.</p></div><div class="clock" data-clock></div></div>
+  <div class="tools">
+    <div class="hfield date" id="date-btn" role="button" tabindex="0" aria-label="Select date range">
+      <span id="date-label">All dates</span>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    </div>
+    <div class="pop" id="date-pop">
+      <label>From<input type="date" id="history-from"></label>
+      <label>To<input type="date" id="history-to"></label>
+      <button class="btn ghost" id="history-reset" type="button">Clear filters</button>
+    </div>
+    <label class="hfield search">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="history-search" type="search" placeholder="Search transaction id..." aria-label="Search transaction id">
+    </label>
+    <button class="btn dark hfilter" id="filter-btn" type="button">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+      Filter <span class="fdot" id="filter-dot"></span>
+    </button>
+    <div class="pop right" id="filter-pop">
+      <label>Status
+        <select id="history-status" aria-label="Status filter"><option value="">All status</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
+      </label>
+    </div>
+  </div>
+  <div class="tx-card">
+    <table id="history-table"><thead><tr><th style="width:76px">#</th><th>Transaction ID</th><th>Date &amp; Time</th><th>Total Items</th><th>Total Amount</th><th>Status</th></tr></thead><tbody id="history-body"></tbody></table>
+  </div>
+  <div class="tx-foot"><div class="pg" id="history-pg"></div><span id="history-count"></span></div>
+</section>
+
+<!-- TAB 4: INVENTORY -->
+<section id="tab-inventory" class="tab inv">
+  <div class="head"><div><h1>Inventory</h1><p class="sub">Manage product inventory and stock levels.</p></div>
+    <div class="inv-actions"><button class="btn-addp" id="btn-add" type="button">+ Add Product</button><button class="btn-restock" id="btn-epc-mode" type="button">Restock</button></div></div>
+  <section class="inv-toolbar">
+    <label class="ifield isearch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg><input type="search" id="inv-search" placeholder="Search product name.." aria-label="Search product name"></label>
+    <label class="ifield iselect"><select id="inv-cat" aria-label="Category filter"><option value="all">All Categories</option></select><svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></label>
+    <div class="toolbar-right">
+      <button class="icon-btn" id="inv-edit" type="button" title="Edit selected product" aria-label="Edit selected product"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+      <button class="icon-btn" id="inv-toggle" type="button" title="Activate / deactivate selected product" aria-label="Activate or deactivate selected product"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+      <button class="btn-filter" id="inv-filter-btn" type="button"><svg viewBox="0 0 24 24"><path d="M4 7h16M7 12h10M10 17h4"/></svg>Filter <span class="dot"></span></button>
+    </div>
+    <div class="pop right" id="inv-filter-pop">
+      <label>Status<select id="inv-status"><option value="all">All status</option><option value="activated">Activated</option><option value="deactivated">Deactivated</option></select></label>
+      <label>Stock<select id="inv-stock"><option value="all">All stock levels</option><option value="low">Low stock only</option></select></label>
+    </div>
+  </section>
+  <section class="inv-card">
+    <table class="inv-table"><thead><tr><th class="num">#</th><th>Product Name</th><th>Category</th><th class="center">Stock</th><th class="center">Price</th><th class="center">Status</th></tr></thead><tbody id="inv-body"></tbody></table>
+  </section>
+  <footer class="table-footer"><nav class="ipag" id="inv-pagination"></nav><div class="showing" id="inv-count"></div></footer>
+  <p class="hint" style="margin-top:10px">Tip: click a row to select it, then use the edit or deactivate icons.</p>
+</section>
+
+<!-- TAB 5: PRODUCT RECOGNITION (start scanning) -->
+<section id="tab-scan" class="tab cfd">
+  <h1>Product Recognition System</h1>
+  <p class="sub">Start the system to begin customer checkout.</p>
+  <div class="cfd-card">
+    <div class="scan-icon" aria-hidden="true">▣</div>
+    <h2>Ready to Start</h2>
+    <p>Click the button below to start the product recognition system and begin customer checkout.<br>Manager password verification is required.</p>
+    <button class="btn start-btn" id="btn-start-scan">▶ Start System</button>
+  </div>
+</section>
+</main>
+
+<!-- LOGIN / SIGNUP -->
+<div id="login">
+  <div class="lg-brand" aria-hidden="true">
+    <svg viewBox="0 0 580 150" fill="none" stroke="#ff6b00" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 22h22l18 74h66"/><circle cx="58" cy="124" r="13"/>
+      <rect x="52" y="8" width="78" height="64" rx="12"/>
+      <path d="M72 26v28M82 24v30M92 24v30M102 26v28M112 28v24" stroke-width="6"/>
+      <text x="150" y="98" fill="#ff6b00" stroke="none" font-size="70" font-weight="800" font-family="Segoe UI,Roboto,Arial,sans-serif">QuickMart</text>
+    </svg>
+  </div>
+  <div class="lg-wrap">
+
+    <!-- SIGN IN FORM -->
+    <form class="lg-form active" id="login-form" novalidate>
+      <h1>Welcome back!</h1>
+      <p class="lg-sub">Sign in with your manager credentials.</p>
+      <label for="login-user">Username</label>
+      <div class="lg-field"><input id="login-user" type="text" placeholder="e.g. M-20411" autocomplete="off"></div>
+      <label for="login-pass">Password</label>
+      <div class="lg-field"><input id="login-pass" type="password" placeholder="••••••••" autocomplete="off">
+        <button type="button" class="lg-eye" id="login-eye" aria-label="Show password"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+      <button type="button" class="lg-forgot" id="btn-forgot-login">Forgot Password?</button>
+      <div class="lg-err" id="login-err" role="alert"></div>
+      <button type="submit" class="lg-btn" id="btn-login">Sign In <span aria-hidden="true">→</span></button>
+      <p class="lg-switch">Don't have an account? <a id="link-to-signup" href="#">Create one</a></p>
+    </form>
+
+    <!-- SIGN UP FORM -->
+    <form class="lg-form" id="signup-form" novalidate>
+      <h1>Create account</h1>
+      <p class="lg-sub">Register a new manager account.</p>
+      <label for="signup-user">Username</label>
+      <div class="lg-field"><input id="signup-user" type="text" placeholder="e.g. admin" autocomplete="off"></div>
+      <label for="signup-pass">Password</label>
+      <div class="lg-field"><input id="signup-pass" type="password" placeholder="••••••••" autocomplete="off">
+        <button type="button" class="lg-eye" id="signup-eye" aria-label="Show password"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+      <label for="signup-conf">Confirm Password</label>
+      <div class="lg-field"><input id="signup-conf" type="password" placeholder="••••••••" autocomplete="off"></div>
+      <div class="lg-err" id="signup-err" role="alert"></div>
+      <button type="submit" class="lg-btn" id="btn-signup">Sign Up <span aria-hidden="true">→</span></button>
+      <p class="lg-switch">Already have an account? <a id="link-to-login" href="#">Sign In</a></p>
+    </form>
+
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="modal" id="m-auth" role="dialog" aria-modal="true"><div class="mbox">
+  <h2 id="auth-title">Manager verification</h2>
+  <div class="astep on" id="as1"><h3>Layer 1 of 3 · RFID scan</h3><p class="sub">Tap your manager card on the reader.</p>
+    <div class="pad">Waiting for card…</div><div class="err" id="e1"></div></div>
+  <div class="astep" id="as2"><h3>Password verification</h3><p class="sub">Enter your manager password.</p>
+    <div class="fg" style="margin-top:14px"><input type="password" id="auth-pw" placeholder="Password" autocomplete="off"></div><div class="err" id="e2"></div>
+    <button class="btn" id="btn-pw" style="width:100%">Verify password</button></div>
+  <div class="astep" id="as3"><h3>Layer 3 of 3 · Master key</h3><p class="sub">Enter the master key to authorize.</p>
+    <div class="fg" style="margin-top:14px"><input type="password" id="auth-mk" placeholder="Master key" autocomplete="off"></div><div class="err" id="e3"></div>
+    <button class="btn" id="btn-mk" style="width:100%">Authorize</button>
+    <button class="link" id="btn-forgot">Reset or change password</button></div>
+  <div class="astep" id="as4"><h3>Reset Password</h3><p class="sub">Enter your registered Gmail address to receive reset instructions.</p>
+    <div class="fg" style="margin-top:14px;text-align:left"><label>Gmail address</label><input type="email" id="rs-gmail" placeholder="e.g. manager@gmail.com" autocomplete="off" style="text-align:left"></div>
+    <div class="err" id="e4"></div>
+    <button class="btn" id="btn-gmail-received" style="width:100%">Gmail received</button></div>
+  <div class="astep" id="as5"><h3>Set New Password</h3><p class="sub">Please enter your new password below.</p>
+    <div class="fg" style="margin-top:14px;text-align:left"><label>New password</label><input type="password" id="rs-new" autocomplete="off" style="text-align:left"></div>
+    <div class="fg" style="text-align:left"><label>Confirm new password</label><input type="password" id="rs-conf" autocomplete="off" style="text-align:left"></div>
+    <div class="err" id="e5"></div>
+    <button class="btn" id="btn-update-password" style="width:100%">Update password</button></div>
+  <button class="btn ghost" id="btn-auth-cancel" style="width:100%;margin-top:12px">Cancel</button>
+</div></div>
+
+<!-- PRODUCT MODAL -->
+<div class="modal" id="m-product" role="dialog" aria-modal="true"><div class="mbox">
+  <h2 id="p-title">Add new product</h2><p class="d">Enter details for the new product profile.</p>
+  <input type="hidden" id="p-id">
+  <div class="fg"><label for="p-code">Product ID</label><input id="p-code" readonly style="background:#eef2f5;font-weight:600"></div>
+  <div class="fg"><label for="p-name">Product Name</label><input id="p-name" placeholder="e.g. Fresh Milk 1L" autocomplete="off"></div>
+  <div class="fg"><label for="p-desc">Description</label><textarea id="p-desc" placeholder="Enter product details, specifications, or notes..."></textarea></div>
+  <div class="fg"><label for="p-cat">Category</label><input id="p-cat" list="p-cats" placeholder="e.g. Beverages" autocomplete="off"><datalist id="p-cats"></datalist></div>
+  <div class="fg"><label for="p-price">Price (₱)</label><input id="p-price" type="number" min="0" step="0.01" placeholder="0.00"></div>
+  <div class="err" id="ep"></div>
+  <div class="mfoot"><button class="btn ghost" data-close="m-product">Cancel</button><button class="btn" id="btn-save-product">Save product</button></div>
+</div></div>
+
+<!-- EPC MODAL -->
+<div class="modal" id="m-epc" role="dialog" aria-modal="true"><div class="mbox">
+  <h2>Assign EPC tag</h2><p class="d">Select a product, then scan its UHF tag. Stock increases by 1 for each tag assigned.</p>
+  <div class="fg"><label for="epc-product">Product</label><select id="epc-product"></select></div>
+  <div class="fg"><label>Category</label><input id="epc-cat" readonly></div>
+  <div class="fg"><label>Current stock</label><input id="epc-stock" readonly></div>
+  <div class="fg"><label>Price</label><input id="epc-price" readonly></div>
+  <div class="fg"><label>EPC code</label><input id="epc-code" readonly placeholder="Waiting for scan…"></div>
+  <div class="err" id="ee"></div>
+  <div class="mfoot"><button class="btn ghost" data-close="m-epc">Close</button></div>
+</div></div>
+
+<!-- KIOSK -->
+<div id="kiosk" class="idle">
+  <div class="khead"><div class="klogo"><svg viewBox="0 0 140 140" width="52" height="52" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 22h22l18 74h66"/><circle cx="58" cy="124" r="13"/><rect x="52" y="8" width="78" height="64" rx="12"/><path d="M72 26v28M82 24v30M92 24v30M102 26v28M112 28v24" stroke-width="7"/></svg><span>QuickMart</span></div><div class="kright"><span class="kstation">Self-Checkout Station 01</span><button class="btn ghost" id="btn-kiosk-exit">Manager exit</button></div></div>
+
+  <div class="screen on" id="k-idle"><div class="idle-icon"><svg viewBox="0 0 140 140" width="190" height="190" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 22h22l18 74h66"/><circle cx="58" cy="124" r="13"/><rect x="52" y="8" width="78" height="64" rx="12"/><path d="M72 26v28M82 24v30M92 24v30M102 26v28M112 28v24" stroke-width="7"/></svg></div><h1>Welcome!</h1><p class="lead">Scan or place your products to begin checkout.</p></div>
+
+  <div class="screen" id="k-cart" style="justify-content:flex-start;padding-top:10px">
+    <div class="banner" id="assist-banner"><span><b>Staff has been notified.</b> Someone will be with you shortly.</span><button class="btn ghost" id="btn-assist-dismiss">Dismiss</button></div>
+    <h1 style="font-size:34px;text-align:left;width:100%;max-width:1150px">Your items</h1>
+    <div class="cartwrap">
+      <div class="card"><table><thead><tr><th>Product</th><th>Unit price</th><th>Qty</th><th>Subtotal</th></tr></thead><tbody id="cart-body"></tbody></table></div>
+      <div class="card sum">
+        <div class="row"><span>Items</span><b id="sum-items">0</b></div>
+        <div class="row"><span>Tax / fees</span><b id="sum-tax">₱0.00</b></div>
+        <div class="row tot"><span>Total</span><span id="sum-total">₱0.00</span></div>
+        <div class="acts">
+          <button class="btn ok" id="btn-checkout">Confirm & checkout</button>
+          <button class="btn ghost" id="btn-assist">Request assistance</button>
+          <button class="btn danger" id="btn-cancel">Cancel order</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="k-qr">
+    <h1 style="font-size:34px">Ready to pay</h1>
+    <p class="lead" style="margin-bottom:8px">Scan your QuickMart payment QR code.</p>
+    <div class="qr-box" id="qr-box"><div id="qr-reader"></div><div class="scan-frame-corners"></div><div class="scan-line"></div></div>
+    <p class="qr-status" id="qr-status" role="status">Starting camera…</p>
+    <p class="timer">Payment closes in <span id="qr-timer">05:00</span></p>
+    <p class="sub">Total amount</p><p class="amt" id="qr-total">₱0.00</p>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn ghost" id="btn-qr-back">Back to cart</button>
+      <button class="btn" id="btn-cam-retry" style="display:none">Try camera again</button>
+      <button class="btn danger" id="btn-cancel-scan" style="display:none">Cancel Payment</button>
+    </div>
+  </div>
+
+  <div class="screen" id="k-success"><div class="ricon" style="color:var(--ok)">✔</div><h1 style="color:var(--ok)">Payment Successful!</h1>
+    <p class="lead" style="margin-bottom:10px">Thank you for shopping with us!</p>
+    <div class="sid" id="ok-sid">SESS-0000-0000</div>
+    <div class="receipt" id="ok-receipt"></div>
+    <button class="btn dark" id="btn-new" style="padding:14px 44px;font-size:17px">Start new session</button></div>
+
+  <div class="screen" id="k-fail"><div class="ricon" style="color:var(--bad)">!</div><h1 style="color:var(--bad)">Payment Didn't Go Through</h1>
+    <p class="lead" id="fail-reason">Please try again or request assistance.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;width:300px">
+      <button class="btn" id="btn-retry" style="padding:15px">Try again</button>
+      <button class="btn ghost" id="btn-assist2" style="padding:15px">Request assistance</button>
+      <button class="btn danger" id="btn-cancel2" style="padding:15px">Cancel transaction</button></div></div>
+  <svg class="wave-footer" viewBox="0 0 1440 160" preserveAspectRatio="none" aria-hidden="true"><path fill="#FF6B1A" d="M0 8C260 22 520 80 800 108S1300 118 1440 50L1440 160L0 160Z"/><path fill="#166B3A" d="M0 26C260 40 520 98 800 126S1300 136 1440 72L1440 160L0 160Z"/></svg>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+<script src="js/storage.js"></script>
+<script src="js/state.js"></script>
+<script src="js/backend.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/navigation.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/history.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/qr-payment.js"></script>
+<script src="js/camera-scanner.js"></script>
+<script src="js/kiosk.js"></script>
+<script src="js/login.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

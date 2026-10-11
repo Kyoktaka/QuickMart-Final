@@ -1,0 +1,14 @@
+/* --- MODALS --- */
+.modal{position:fixed;inset:0;background:rgba(20,108,67,.55);display:none;align-items:center;justify-content:center;z-index:2500;opacity:0;transition:opacity 0.3s ease}
+.modal.on{display:flex;opacity:1}
+.mbox{background:#fff;border-radius:10px;width:92%;max-width:460px;padding:28px;max-height:92vh;overflow-y:auto;transform:scale(0.95);transition:transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)}
+.modal.on .mbox{transform:scale(1)}
+.mbox h2{font-size:20px;color:var(--primary-green);margin-bottom:6px}.mbox p.d{color:var(--mute);font-size:14px;margin-bottom:16px}
+.fg{margin-bottom:14px}.fg label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}.fg input,.fg select,.fg textarea{width:100%}
+.mfoot{display:flex;gap:10px;margin-top:20px}.mfoot .btn{flex:1}
+.astep{display:none;text-align:center}.astep.on{display:block;animation:fadeInUp 0.3s ease}
+.astep h3{color:var(--primary-green);margin-bottom:6px}.astep .pad{border:2px dashed var(--gray);border-radius:10px;padding:26px;margin:16px 0;color:var(--mute);transition:var(--transition)}
+.astep .pad:hover{border-color:var(--primary-orange);background:#fff9f5}
+.astep input{text-align:center;width:100%;font-size:16px}
+.err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
+.hint{font-size:12px;color:var(--mute);margin-top:12px}

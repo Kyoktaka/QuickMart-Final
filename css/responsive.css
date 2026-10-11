@@ -1,0 +1,4 @@
+/* --- RESPONSIVE --- */
+@media(max-width:800px){#login{flex-direction:column}.lg-brand{flex:0 0 170px;padding:20px}.lg-wrap{padding:24px}.lg-form h1{font-size:34px}}
+@media(max-width:900px){.grid2,.cartwrap{grid-template-columns:1fr;flex-direction:column}.sidebar{width:72px}.brand,.me{display:none}nav button{padding:16px 0;text-align:center;font-size:11px}.tab{padding:18px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}tbody tr{opacity:1}}

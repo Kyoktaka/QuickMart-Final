@@ -1,0 +1,18 @@
+:root{
+  --primary-green:#146c43;
+  --primary-orange:#ff6b00;
+  --bg:#f4f7f6;
+  --ink:#1a1a1a;
+  --mute:#6b7280;
+  --ok:#2E8B57;
+  --warn:#E8821E;
+  --bad:#D64545;
+  --white:#fff;
+  --gray:#cbd5e1;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Roboto,Arial,sans-serif}
+body{display:flex;height:100vh;overflow:hidden;background:var(--bg);color:var(--ink)}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--primary-orange);outline-offset:2px}

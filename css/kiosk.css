@@ -1,0 +1,22 @@
+/* --- KIOSK --- */
+#kiosk{position:fixed;inset:0;background:var(--bg);z-index:2000;display:none;flex-direction:column;padding:26px 34px;overflow-y:auto}
+#kiosk.on{display:flex;animation:fadeIn 0.4s ease}
+.khead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.klogo{font-size:26px;font-weight:700;color:var(--primary-green)}.klogo b{color:var(--primary-orange)}
+.screen{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.screen.on{display:flex;animation:fadeInUp 0.4s ease}
+.screen h1{font-size:46px;color:var(--primary-green);margin-bottom:10px}.screen .lead{font-size:20px;color:var(--mute);margin-bottom:28px}
+.tray{width:220px;height:130px;border:4px dashed var(--primary-orange);border-radius:20px;margin-bottom:28px;display:flex;align-items:center;justify-content:center;color:var(--primary-orange);font-size:15px;font-weight:600;animation:pulseGlow 2s infinite}
+.cartwrap{display:flex;gap:22px;width:100%;max-width:1150px;text-align:left;align-items:flex-start}
+.cartwrap .card:first-child{flex:2}.sum{flex:1;position:sticky;top:0}
+.row{display:flex;justify-content:space-between;margin-bottom:12px;font-size:15px}
+.row.tot{font-size:24px;font-weight:700;border-top:2px solid #e8edf1;padding-top:14px;color:var(--primary-green)}
+.acts{display:flex;flex-direction:column;gap:10px;margin-top:20px}.acts .btn{padding:15px;font-size:16px}
+.banner{background:#fdecd9;border:1px solid var(--warn);color:#8a4a0c;padding:12px 16px;border-radius:8px;margin-bottom:14px;display:none;justify-content:space-between;align-items:center;font-size:14px;width:100%;max-width:1150px}
+.banner.on{display:flex;animation:fadeInUp 0.3s ease}
+.timer{font-size:22px;font-weight:700}.timer span{color:var(--bad);font-variant-numeric:tabular-nums}
+.amt{font-size:38px;font-weight:800;color:var(--primary-green);margin:6px 0 16px;animation:countUp 0.5s ease}
+.ricon{font-size:72px;margin-bottom:10px;animation:fadeInUp 0.5s ease}
+.receipt{background:#fff;border:1px solid var(--gray);border-radius:10px;padding:18px 22px;min-width:340px;text-align:left;margin:16px 0;animation:fadeInUp 0.4s ease}
+.receipt .row{margin-bottom:6px;font-size:14px}
+.sid{background:#fff;border:2px dashed var(--gray);padding:10px 26px;border-radius:10px;font-weight:700;font-size:20px;color:var(--primary-green);animation:fadeInUp 0.3s ease}
