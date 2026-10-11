@@ -1,8 +1,22 @@
-/* ===== INIT ===== */
-function renderAll(){
-  state.products.forEach(p=>{p.epcs=p.epcs||[];if(!p.code)p.code=codeFor(p.id)});
-  renderDashboard();renderHistory();renderInventory();
+/* ===== APP STARTUP AND SERVER-SIDE REFRESH ===== */
+function renderAll(){renderInventory();renderHistory();renderDashboard()}
+async function refreshAll(){
+  const [products,sessions,dashboard]=await Promise.all([
+    Backend.loadProducts(),Backend.loadSessions(),Backend.loadDashboard()
+  ]);
+  state.products=products;state.sessions=sessions;state.dashboard=dashboard;
+  renderAll();
 }
-window.QuickMart={state,renderAll,addActivity:pushActivity,setSalesChart(r,labels,data){chartData[r]={labels,data};renderChart()}};
-renderAll();
-lock();   // manager must sign in before seeing the system (Log out calls lock() too)
+window.QuickMart={state,renderAll,refreshAll,addActivity:pushActivity,
+  setSalesChart(r,labels,data){chartData[r]={labels,data};renderChart()}};
+async function initQuickMart(){
+  document.body.classList.add('locked');
+  try{
+    const res=await Backend.me();
+    if(!res.authenticated)return;
+    state.manager=res.manager;
+    await refreshAll();
+    document.body.classList.remove('locked');goTab('dashboard');
+  }catch(e){console.warn('Could not restore session:',e.message)}
+}
+initQuickMart();

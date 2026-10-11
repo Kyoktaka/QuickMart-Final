@@ -63,13 +63,16 @@ async function onQrDecoded(text){
   try{navigator.vibrate&&navigator.vibrate(80)}catch(e){}
   beep();
   try{
-    const r=await Backend.processPayment(String(text),cartTotal());
+    const r=await Backend.processPayment(String(text));
     await stopCameraScanner();
-    if(r.result==='success'){status.textContent='✅ '+r.reason;status.className='qr-status ok';await completePayment()}
-    else{
+    if(r.result==='success'){status.textContent='✅ '+r.reason;status.className='qr-status ok';await completePayment(r.purchase)}
+    else if(r.result==='failed'){
       status.textContent='❌ '+r.reason;status.className='qr-status bad';
       stopTimer();await finalize('failed',r.reason);
-      setTimeout(()=>{if(onScreen('k-qr')){$('#fail-reason').textContent=r.reason;screen('k-fail')}},900);   // let the customer read the reason first
+      setTimeout(()=>{if(onScreen('k-qr')){$('#fail-reason').textContent=r.reason;screen('k-fail')}},900);
+    }else{
+      status.textContent='Checkout unavailable: '+r.reason;status.className='qr-status bad';
+      stopTimer();$('#btn-cam-retry').style.display='';
     }
   }finally{state.processing=false}
 }

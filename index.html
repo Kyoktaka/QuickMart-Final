@@ -92,7 +92,7 @@
     </button>
     <div class="pop right" id="filter-pop">
       <label>Status
-        <select id="history-status" aria-label="Status filter"><option value="">All status</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
+        <select id="history-status" aria-label="Status filter"><option value="">All status</option><option value="completed">Completed</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option></select>
       </label>
     </div>
   </div>
@@ -155,8 +155,8 @@
     <form class="lg-form active" id="login-form" novalidate>
       <h1>Welcome back!</h1>
       <p class="lg-sub">Sign in with your manager credentials.</p>
-      <label for="login-user">Username</label>
-      <div class="lg-field"><input id="login-user" type="text" placeholder="e.g. M-20411" autocomplete="off"></div>
+      <label for="login-user">Manager Email</label>
+      <div class="lg-field"><input id="login-user" type="email" placeholder="manager@example.com" autocomplete="username"></div>
       <label for="login-pass">Password</label>
       <div class="lg-field"><input id="login-pass" type="password" placeholder="••••••••" autocomplete="off">
         <button type="button" class="lg-eye" id="login-eye" aria-label="Show password"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
@@ -172,6 +172,8 @@
       <p class="lg-sub">Register a new manager account.</p>
       <label for="signup-user">Username</label>
       <div class="lg-field"><input id="signup-user" type="text" placeholder="e.g. admin" autocomplete="off"></div>
+      <label for="signup-email">Email Address</label>
+      <div class="lg-field"><input id="signup-email" type="email" placeholder="manager@example.com" autocomplete="email"></div>
       <label for="signup-pass">Password</label>
       <div class="lg-field"><input id="signup-pass" type="password" placeholder="••••••••" autocomplete="off">
         <button type="button" class="lg-eye" id="signup-eye" aria-label="Show password"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
@@ -200,7 +202,7 @@
   <div class="astep" id="as4"><h3>Reset Password</h3><p class="sub">Enter your registered Gmail address to receive reset instructions.</p>
     <div class="fg" style="margin-top:14px;text-align:left"><label>Gmail address</label><input type="email" id="rs-gmail" placeholder="e.g. manager@gmail.com" autocomplete="off" style="text-align:left"></div>
     <div class="err" id="e4"></div>
-    <button class="btn" id="btn-gmail-received" style="width:100%">Gmail received</button></div>
+    <button class="btn" id="btn-gmail-received" style="width:100%">Send reset link</button></div>
   <div class="astep" id="as5"><h3>Set New Password</h3><p class="sub">Please enter your new password below.</p>
     <div class="fg" style="margin-top:14px;text-align:left"><label>New password</label><input type="password" id="rs-new" autocomplete="off" style="text-align:left"></div>
     <div class="fg" style="text-align:left"><label>Confirm new password</label><input type="password" id="rs-conf" autocomplete="off" style="text-align:left"></div>
@@ -272,7 +274,7 @@
     </div>
   </div>
 
-  <div class="screen" id="k-success"><div class="ricon" style="color:var(--ok)">✔</div><h1 style="color:var(--ok)">Payment Successful!</h1>
+  <div class="screen" id="k-success"><div class="ricon" style="color:var(--ok)">✔</div><h1 style="color:var(--ok)">Demo Checkout Successful!</h1>
     <p class="lead" style="margin-bottom:10px">Thank you for shopping with us!</p>
     <div class="sid" id="ok-sid">SESS-0000-0000</div>
     <div class="receipt" id="ok-receipt"></div>
@@ -301,6 +303,7 @@
 <script src="js/inventory.js"></script>
 <script src="js/qr-payment.js"></script>
 <script src="js/camera-scanner.js"></script>
+<script src="assets/js/rfid-scanner.js"></script>
 <script src="js/kiosk.js"></script>
 <script src="js/login.js"></script>
 <script src="js/main.js"></script>

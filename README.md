@@ -1,65 +1,53 @@
-# QuickMart Final — Integrated RFID Checkout
+# QuickMart Final — Integrated Frontend and PHP/MySQL Backend
 
-Source: the group's QuickMart visual frontend and the PHP/MySQL backend from
-`Kyoktaka/rfid-checkout-backend`.
+The original visual design, CSS files, and login background are preserved.
+Manager accounts, products, EPC stock and transaction records are persisted in
+the existing PHP/MySQL backend. No browser-stored passwords or simulated wallets.
 
-> **Integration in progress:** This repository contains the latest PHP/MySQL backend.
-> The frontend is supplied as a separate **QuickMart-Final Frontend Overlay** ZIP
-> until its original binary design assets have been uploaded. Do not assume that
-> this repository is independently runnable without `index.html`, `css/`,
-> `js/`, and `assets/images/`.
+## Run in XAMPP
 
-## Running under XAMPP
+1. Clone Kyoktaka/QuickMart-Final into C:\xampp\htdocs\QuickMart-Final.
+2. Start Apache and MySQL.
+3. For a fresh DB import database/schema.sql in phpMyAdmin (creates rfid_checkout_main).
+   Do not run a historical migration after a fresh import.
+4. Check config/database.php settings for local XAMPP MySQL.
+5. Run composer install for PHPMailer.
+6. Visit http://localhost/QuickMart-Final/
+7. Signup is only for the first manager on localhost: name, email, password
+   (8–72 bytes). All subsequent login uses manager email, not username.
+8. Configure QUICKMART_SMTP_USERNAME and QUICKMART_SMTP_PASSWORD in PHP/Apache
+   environment to send reset-password emails. Restart Apache after changes.
+   The emailed secure token link changes passwords; the browser does not.
 
-1. Install/clone to `C:\xampp\htdocs\QuickMart-Final`.
-2. Copy the contents of the integrated frontend overlay's `frontend/` folder
-   into the repository root. Keep the existing CSS and images.
-3. Start Apache and MySQL. Use **a fresh database**: import
-   `database/schema.sql` with phpMyAdmin. On a fresh import, **do not run migrations**.
-4. Confirm `config/database.php` matches the local database.
-5. Run `composer install` from the project root for PHPMailer.
-6. Open `http://localhost/QuickMart-Final/`.
-7. Sign up **the first manager only** (username + email + 8–72 byte password)
-   on the same localhost machine, then sign in with the **email** and password.
-   Once the first manager exists, open signup is disabled by design.
-8. For forgot password set SMTP environment variables
-   `QUICKMART_SMTP_USERNAME` and `QUICKMART_SMTP_PASSWORD` (Gmail app password),
-   and optionally `QUICKMART_APP_BASE_URL` to match the local URL.
+## RFID integration
 
-## Checkout payment simulation
+The assets/js/rfid-scanner.js handler captures EPCs from the USB HID
+keyboard-emulation UHF reader. Inventory modal registers EPCs using PHP API.
+Kiosk scan calls PHP detect endpoint and builds grouped cart items. No local
+stock deduction occurs. Only committed backend checkout marks EPCs PURCHASED.
+Tag presence is approximated via a 3-second grace timeout; test on hardware.
+Manager start/exit verification uses the password auth backend; demo RFID
+manager card and master-key tricks are disabled.
 
-No real payment gateway is integrated, and a scanned QR is not a real payment.
-In the PHP/Apache server environment, for **localhost demonstration only**, set:
-```
-QUICKMART_APP_ENV=development
-QUICKMART_DEMO_CHECKOUT=1
-```
-Example simulated QR payload: `QMPAY|DEMO|C293`. Its checksum is not a
-cryptographic signature and must never be used for real purchases. Payment
-checkout remains blocked with HTTP 503 without explicit demo flags, and also
-requires an active manager-authorized scan session.
+## Local demonstration QR checkout ONLY
 
-The connected USB UHF RFID keyboard-emulation reader emits EPC strings.
-This cannot fully establish physical tag presence; calibrate the 3-second
-grace period on actual hardware. The backend owns EPC registration and marks
-each tag `PURCHASED` only on a committed checkout.
+Real payment is NOT integrated. Without explicit demo flags, the checkout API
+responds HTTP 503 and will not mark tags purchased.
+For school demo on local server only, configure PHP/Apache:
+  QUICKMART_APP_ENV=development
+  QUICKMART_DEMO_CHECKOUT=1
+Restart Apache and use QR text:
+  QMPAY|DEMO|C293
+The QR checksum is not a real payment signature. No balance, banking or
+real payment status is verified. This must never be enabled publicly.
 
-## Data contracts
+## Transaction History and Dashboard
 
-- `api/auth/`: secure PHP manager sessions and password recovery.
-- `api/products/`: create/update/list/deactivate/reactivate product data.
-- `api/rfid/`: EPC lookup and product registration.
-- `api/checkout/`: checkout and failed/cancelled attempt log.
-- `api/transactions/list.php`: stored transaction records and product receipts.
-- `api/dashboard/summary.php`: MySQL sales and inventory metrics.
+The PHP endpoints return real purchase records, item details for successful
+purchases, failed/cancelled events, sales totals, and available stock counts.
+Activity Feed remains temporary browser memory; it is NOT permanent audit logging.
 
-The dashboard activity feed is in-memory only. Permanent activity auditing
-would require an additional `ACTIVITY_LOGtbl` and backend writer logic.
+## Testing
 
-## Validation
-
-Automated GitHub Actions checks PHP and frontend JS syntax.
-Live database/SMTP/USB reader/demo checkout integration still requires XAMPP
-testing on the target machine.
-
-**Do not deploy the demo checkout to a public server.**
+GitHub Actions checks PHP/JS syntax. This does not replace live XAMPP/MySQL,
+PHPMailer SMTP, reader hardware, camera or browser flow testing.

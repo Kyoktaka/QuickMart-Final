@@ -1,52 +1,139 @@
-/* ===== KIOSK ===== */
-function screen(id){$$('.screen').forEach(s=>s.classList.toggle('on',s.id===id));$('#kiosk').classList.toggle('idle',id==='k-idle');if(id!=='k-qr'){stopTimer();stopCameraScanner()}}
-let timerId=null,left=TIMEOUT;
-const cartTotal=()=>state.cart.reduce((a,i)=>a+i.price*i.qty,0),cartQty=()=>state.cart.reduce((a,i)=>a+i.qty,0);
+/* ===== SELF-CHECKOUT: SERVER-VALIDATED EPCs AND DEMO QR ===== */
+let timerId=null,left=TIMEOUT,trayRevision=0;
+const loggedSessions=new Set();
+const cartTotal=()=>state.cart.reduce((n,i)=>n+i.price*i.qty,0);
+const cartQty=()=>state.cart.reduce((n,i)=>n+i.qty,0);
 function stopTimer(){clearInterval(timerId);timerId=null}
-function startTimer(){stopTimer();left=TIMEOUT;drawTimer();timerId=setInterval(()=>{left--;drawTimer();if(left<=0){stopTimer();stopCameraScanner();
-  const reason='Payment timed out after 5 minutes.';$('#fail-reason').textContent=reason;finalize('failed',reason);screen('k-fail')}},1000)}
-function drawTimer(){$('#qr-timer').textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0')}
-function renderCart(){$('#cart-body').innerHTML=state.cart.map(i=>`<tr data-product-id="${i.id}"><td>${esc(i.name)}</td><td>${peso(i.price)}</td><td>${i.qty}</td><td><b>${peso(i.price*i.qty)}</b></td></tr>`).join('');
-  $('#sum-items').textContent=cartQty();$('#sum-tax').textContent=peso(0);$('#sum-total').textContent=peso(cartTotal());$('#qr-total').textContent=peso(cartTotal())}
-
-async function finalize(status,failReason){
-  const itemsDetail=state.cart.flatMap(i=>(i.scanned||[]).map(epc=>({epc,name:i.name,qty:1,price:i.price})));   // one history line per scanned EPC
-  const ex=state.sessions.findIndex(x=>x.id===state.current),prev=ex>=0?state.sessions[ex].failReason:null;   // a retried session keeps its last failure reason
-  const s={id:state.current,date:new Date(),items:cartQty(),amount:cartTotal(),status,itemsDetail,failReason:status==='success'?null:(failReason||prev||null)};
-  ex>=0?state.sessions[ex]=s:state.sessions.unshift(s);
-  if(status==='success')state.cart.forEach(i=>{
-    const p=state.products.find(x=>x.id===i.id);
-    if(p){p.stock=Math.max(0,p.stock-i.qty);p.epcs=p.epcs.filter(x=>!(i.scanned||[]).includes(x))}   // sold tags leave the product
-  });
-  saveProducts();
-  await Backend.saveSession(s);
-  pushActivity(`Session ${s.id.slice(-4)} ${status==='success'?'Completed':status==='failed'?'Failed':'Cancelled'} - ${peso(s.amount)}`);
-  return s;
+function screen(id){
+  $$('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
+  $('#kiosk').classList.toggle('idle',id==='k-idle');
+  if(id!=='k-qr'){stopTimer();stopCameraScanner()}
+  if(window.RFIDScanner){
+    RFIDScanner.setEnabled(state.kioskOn&&(id==='k-idle'||id==='k-cart'));
+  }
 }
-function resetKiosk(){stopTimer();stopCameraScanner();state.cart=[];state.current=null;state.processing=false;$('#assist-banner').classList.remove('on');$('#btn-assist').disabled=false;screen('k-idle')}
-function enterKiosk(){state.kioskOn=true;$('#kiosk').classList.add('on');resetKiosk()}
-async function exitKiosk(){if(state.cart.length&&state.current){const ex=state.sessions.find(x=>x.id===state.current);if(!ex||ex.status!=='failed')await finalize('cancelled')}   // don't overwrite a failed session
-  state.kioskOn=false;$('#kiosk').classList.remove('on');resetKiosk();goTab('dashboard')}
+function drawTimer(){
+  $('#qr-timer').textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');
+}
+function startTimer(){
+  stopTimer();left=TIMEOUT;drawTimer();
+  timerId=setInterval(()=>{
+    left--;drawTimer();
+    if(left<=0){
+      stopTimer();stopCameraScanner();
+      const reason='Demo payment timed out after 5 minutes.';
+      $('#fail-reason').textContent=reason;
+      void finalize('failed',reason);
+      screen('k-fail');
+    }
+  },1000);
+}
+function renderCart(){
+  $('#cart-body').innerHTML=state.cart.map(i=>
+    '<tr data-product-id="'+i.id+'"><td>'+esc(i.name)+'</td><td>'+peso(i.price)+
+    '</td><td>'+i.qty+'</td><td><b>'+peso(i.price*i.qty)+'</b></td></tr>'
+  ).join('')||'<tr><td colspan="4">No RFID products detected.</td></tr>';
+  $('#sum-items').textContent=cartQty();$('#sum-tax').textContent=peso(0);
+  $('#sum-total').textContent=peso(cartTotal());$('#qr-total').textContent=peso(cartTotal());
+}
+async function finalize(status,reason){
+  if(!state.current||loggedSessions.has(state.current))return;
+  const s={id:state.current,date:new Date(),items:cartQty(),amount:cartTotal(),status};
+  try{
+    await Backend.logSession(s);loggedSessions.add(s.id);
+    state.sessions.unshift({...s,failReason:reason||null});
+    pushActivity('Session '+s.id.slice(-8)+' '+(status==='failed'?'Failed':'Cancelled')+
+      ' - '+peso(s.amount));
+    try{await refreshAll()}catch(e){console.warn('Transaction refresh failed:',e.message)}
+  }catch(e){toast('Could not record checkout attempt: '+e.message)}
+}
+function resetKiosk(){
+  stopTimer();stopCameraScanner();trayRevision++;
+  state.cart=[];state.current=null;state.processing=false;
+  $('#assist-banner').classList.remove('on');$('#btn-assist').disabled=false;
+  screen('k-idle');
+}
+async function enterKiosk(){
+  state.kioskOn=true;$('#kiosk').classList.add('on');resetKiosk();
+  pushActivity('Customer scanning terminal started.');
+}
+async function exitKiosk(){
+  if(state.current&&state.cart.length&&!loggedSessions.has(state.current)){
+    await finalize('cancelled','Scanning session exited.');
+  }
+  try{await Backend.revokeScan()}catch(e){toast(e.message)}
+  state.kioskOn=false;$('#kiosk').classList.remove('on');resetKiosk();
+  goTab('dashboard');
+}
 $('#btn-start-scan').onclick=()=>openAuth(enterKiosk,2,true);
 $('#btn-kiosk-exit').onclick=()=>openAuth(exitKiosk,2,true);
-
-window.addEventListener('rfid:tray',e=>{if(!state.kioskOn||!$('#k-idle').classList.contains('on')&&!$('#k-cart').classList.contains('on'))return;
-  const m={};[...new Set(e.detail)].forEach(epc=>{const p=state.products.find(p=>p.active!==false&&p.epcs.includes(epc));if(p)(m[p.id]=m[p.id]||[]).push(epc)});
-  state.cart=Object.entries(m).map(([id,epcs])=>({...state.products.find(p=>p.id==id),qty:epcs.length,scanned:epcs}));
-  if(!state.cart.length){state.current=null;return screen('k-idle')}
-  if(!state.current)state.current=Backend.newSessionId();
-  renderCart();screen('k-cart')});
-$('#btn-checkout').onclick=()=>{renderCart();screen('k-qr');startTimer();startCameraScanner()};
-$('#btn-retry').onclick=()=>{screen('k-qr');startTimer();startCameraScanner()};
+window.addEventListener('rfid:tray',async e=>{
+  if(!state.kioskOn||(!$('#k-idle').classList.contains('on')&&!$('#k-cart').classList.contains('on')))return;
+  const epcs=[...new Set((e.detail||[]).map(v=>String(v).trim().toUpperCase()))];
+  const revision=++trayRevision;
+  if(!epcs.length){state.cart=[];state.current=null;renderCart();screen('k-idle');return}
+  try{
+    const result=await Backend.detect(epcs);
+    if(revision!==trayRevision||!state.kioskOn)return;
+    state.cart=(result.grouped_items||[]).map(item=>({
+      id:Number(item.product_id),name:item.product_name,
+      price:Number(item.unit_price),qty:Number(item.quantity),scanned:item.epcs||[]
+    }));
+    if(result.unknown_epcs?.length)toast(result.unknown_epcs.length+' unregistered RFID tag(s) ignored.');
+    if(result.purchased_epcs?.length)toast(result.purchased_epcs.length+' previously purchased tag(s) ignored.');
+    if(result.inactive_epcs?.length)toast(result.inactive_epcs.length+' unavailable tag(s) ignored.');
+    if(!state.cart.length){state.current=null;renderCart();screen('k-idle');return}
+    if(!state.current)state.current=Backend.newSessionId();
+    renderCart();screen('k-cart');
+  }catch(error){
+    if(revision!==trayRevision)return;
+    state.cart=[];state.current=null;renderCart();screen('k-idle');toast(error.message);
+  }
+});
+$('#btn-checkout').onclick=()=>{
+  if(!state.cart.length)return toast('Scan a product first.');
+  renderCart();screen('k-qr');startTimer();startCameraScanner();
+};
+$('#btn-retry').onclick=()=>{
+  state.current=Backend.newSessionId();
+  screen('k-qr');startTimer();startCameraScanner();
+};
 $('#btn-qr-back').onclick=()=>screen('k-cart');
-$('#btn-cancel-scan').onclick=async()=>{await stopCameraScanner();stopTimer();await finalize('cancelled');resetKiosk();toast('Payment cancelled')};
-async function completePayment(){stopTimer();await stopCameraScanner();const s=await finalize('success');
-  $('#ok-sid').textContent=s.id;
-  $('#ok-receipt').innerHTML=state.cart.map(i=>`<div class="row"><span>${i.qty} × ${esc(i.name)}</span><span>${peso(i.price*i.qty)}</span></div>`).join('')+`<div class="row tot" style="font-size:18px"><span>Total (${s.items} items)</span><span>${peso(s.amount)}</span></div>`;
-  state.cart=[];state.current=null;screen('k-success')}
-async function cancelOrder(){if(state.current)await finalize('cancelled');resetKiosk();toast('Order cancelled')}
-$('#btn-cancel').onclick=cancelOrder;$('#btn-cancel2').onclick=cancelOrder;$('#btn-new').onclick=resetKiosk;
-async function assist(){await Backend.notifyStaff(state.current);$('#assist-banner').classList.add('on');$('#btn-assist').disabled=true;toast('Staff notified');
-  if($('#k-fail').classList.contains('on'))screen('k-cart')}
+$('#btn-cancel-scan').onclick=async()=>{
+  await stopCameraScanner();stopTimer();
+  await finalize('cancelled','Customer cancelled payment.');
+  resetKiosk();toast('Payment cancelled');
+};
+async function completePayment(receipt){
+  stopTimer();await stopCameraScanner();
+  const session={
+    id:receipt.session_id,date:new Date(),items:Number(receipt.total_items),
+    amount:Number(receipt.total_amount),status:'success'
+  };
+  const cart=[...state.cart];
+  $('#ok-sid').textContent=session.id;
+  $('#ok-receipt').innerHTML=cart.map(i=>
+    '<div class="row"><span>'+i.qty+' × '+esc(i.name)+'</span><span>'+
+    peso(i.price*i.qty)+'</span></div>'
+  ).join('')+'<div class="row tot" style="font-size:18px"><span>Total ('+
+    session.items+' items)</span><span>'+peso(session.amount)+'</span></div>';
+  pushActivity('Demo checkout '+session.id.slice(-8)+' - '+peso(session.amount));
+  loggedSessions.add(session.id);
+  state.cart=[];state.current=null;screen('k-success');
+  try{await refreshAll()}catch(e){toast('Checkout saved; dashboard refresh failed: '+e.message)}
+}
+async function cancelOrder(){
+  if(state.current&&!loggedSessions.has(state.current))await finalize('cancelled','Customer cancelled checkout.');
+  resetKiosk();toast('Order cancelled');
+}
+$('#btn-cancel').onclick=cancelOrder;
+$('#btn-cancel2').onclick=cancelOrder;
+$('#btn-new').onclick=resetKiosk;
+async function assist(){
+  // No staff-notification endpoint exists. Do not falsely claim a message was delivered.
+  toast('Please contact a staff member for assistance.');
+}
 $('#btn-assist').onclick=assist;$('#btn-assist2').onclick=assist;
-$('#btn-assist-dismiss').onclick=()=>{$('#assist-banner').classList.remove('on');$('#btn-assist').disabled=false};
+$('#btn-assist-dismiss').onclick=()=>{
+  $('#assist-banner').classList.remove('on');$('#btn-assist').disabled=false;
+};

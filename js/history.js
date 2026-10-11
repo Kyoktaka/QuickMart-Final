@@ -1,6 +1,6 @@
 /* ===== TRANSACTION HISTORY (Completed / Cancelled) ===== */
 const TX_PAGE=5, txState={page:1};
-const txLabel=st=>st==='success'?'Completed':'Cancelled';   // failed payments are listed as Cancelled
+const txLabel=st=>st==='success'?'Completed':st==='failed'?'Failed':'Cancelled';
 const fmtDay=v=>new Date(v+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 function updateDateLabel(){const f=$('#history-from').value,t=$('#history-to').value;
   $('#date-label').textContent=(!f&&!t)?'All dates':(f?fmtDay(f):'Start')+' - '+(t?fmtDay(t):'End')}
@@ -16,11 +16,11 @@ function renderHistory(){
   txState.page=Math.min(txState.page,pages);
   const start=(txState.page-1)*TX_PAGE,slice=list.slice(start,start+TX_PAGE);
   $('#history-body').innerHTML=slice.length?slice.map((s,i)=>{const l=txLabel(s.status);
-    const d=s.itemsDetail||[],n=s.status==='success'?(d.length||s.items||0):0;
+    const d=s.itemsDetail||[],n=Number(s.items||0);
     const detail=s.status==='success'
-      ?`<div class="detail-content"><h4>Receipt — Items Purchased</h4><table class="detail-table"><thead><tr><th>EPC Code</th><th>Product Detail</th><th>Qty</th><th>Subtotal</th></tr></thead><tbody>${d.length?d.map(x=>`<tr><td><code>${esc(x.epc)}</code></td><td>${esc(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:var(--mute)">No item details available.</td></tr>'}</tbody></table><div class="detail-total"><span>Total (${n} items)</span><span>${peso(s.amount)}</span></div></div>`
-      :`<div class="failed-detail"><strong>✕ Transaction Cancelled</strong><p>Session ID: <b>${esc(s.id)}</b></p><p>Date &amp; Time: <b>${fmt(s.date)}</b></p><p>${s.failReason?'Reason: <b>'+esc(s.failReason)+'</b>':'No receipt available for this transaction.'}</p></div>`;
-    return `<tr class="history-row" tabindex="0" aria-expanded="false"><td class="hnum"><span class="toggle-icon">▶</span>${start+i+1}</td><td><b>${esc(s.id)}</b></td><td>${fmt(s.date)}</td><td>${n} items</td><td>${peso(s.amount)}</td><td><span class="badge ${l.toLowerCase()}">${l}</span></td></tr><tr class="history-details"><td colspan="6">${detail}</td></tr>`}).join('')
+      ?`<div class="detail-content"><h4>Receipt — Items Purchased</h4><table class="detail-table"><thead><tr><th>EPC Code</th><th>Product Detail</th><th>Qty</th><th>Subtotal</th></tr></thead><tbody>${d.length?d.map(x=>`<tr><td><code>${esc(x.epc||'—')}</code></td><td>${esc(x.name)}</td><td>${x.qty}</td><td>${peso(x.price*x.qty)}</td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:var(--mute)">No item details available.</td></tr>'}</tbody></table><div class="detail-total"><span>Total (${n} items)</span><span>${peso(s.amount)}</span></div></div>`
+      :`<div class="failed-detail"><strong>✕ ${esc(l==='Failed'?'Transaction Failed':'Transaction Cancelled')}</strong><p>Session ID: <b>${esc(s.id)}</b></p><p>Date &amp; Time: <b>${fmt(s.date)}</b></p><p>${s.failReason?'Reason: <b>'+esc(s.failReason)+'</b>':'No receipt available for this transaction.'}</p></div>`;
+    return `<tr class="history-row" tabindex="0" aria-expanded="false"><td class="hnum"><span class="toggle-icon">▶</span>${start+i+1}</td><td><b>${esc(s.id)}</b></td><td>${fmt(s.date)}</td><td>${n} items</td><td>${peso(s.amount)}</td><td><span class="badge ${l==='Failed'?'cancelled':l.toLowerCase()}">${l}</span></td></tr><tr class="history-details"><td colspan="6">${detail}</td></tr>`}).join('')
     :'<tr class="empty"><td colspan="6" class="msg">No transactions found.</td></tr>';
   const pg=$('#history-pg');pg.innerHTML='';
   const add=(label,page,o={})=>{const b=document.createElement('button');b.textContent=label;b.disabled=!!o.disabled;
