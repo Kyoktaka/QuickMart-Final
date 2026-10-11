@@ -36,20 +36,45 @@ assert.equal(events.filter(e=>e.type==='rfid:epc').length,1,
 scan(b);
 assert.deepEqual([...reader.getPresentEpcs()],[a,b]);
 assert.equal(events.filter(e=>e.type==='rfid:epc').length,2);
-now+=3000;intervalFn();
-assert.deepEqual([...reader.getPresentEpcs()],[a,b],
-  'Do not remove items immediately after transient read gap');
+// Both EPCs continue to be emitted while the items sit on the tray.
+// No item may disappear if every EPC keeps receiving repeated reads.
+for(let i=0;i<6;i++){
+  now+=600;
+  scan(a);
+  now+=200;
+  scan(b);
+  intervalFn();
+  assert.deepEqual([...reader.getPresentEpcs()],[a,b],
+    'Continuous repeated reads must keep BOTH physical tags on screen');
+}
+assert.equal(events.filter(e=>e.type==='rfid:epc').length,2,
+  'Continuously reread tags should not generate new registration events');
+
+// After the tags are physically removed, no further EPC reads arrive.
+// Expiry is inferred rapidly; we deliberately do NOT wait 12 seconds.
+now+=2700;intervalFn();
+assert.deepEqual([...reader.getPresentEpcs()],[],
+  'Both tags must disappear promptly after the stream stops');
 reader.disable();
-assert.deepEqual([...reader.getPresentEpcs()],[]);
 assert.equal(reader.isEnabled(),false);
 assert.equal(events.at(-1).type,'rfid:tray');
 assert.equal(events.filter(e=>e.type==='rfid:epcs').length,0,
-  'Never forward tray snapshots to the registration handler');
-reader.enable();scan(a);
-now+=4000;intervalFn();
+  'Tray snapshots must never bulk-register EPCs in Restock mode');
+
+// One read without any following repeat also must not linger for 12 seconds.
+reader.enable();
+scan(a);
+now+=1000;intervalFn();
 assert.deepEqual([...reader.getPresentEpcs()],[a],
-  'A single-read tag should be held during initial grace window');
-now+=9000;intervalFn();
+  'Allow short read gaps without instant flicker');
+now+=600;intervalFn();
 assert.deepEqual([...reader.getPresentEpcs()],[],
-  'After the grace interval expires, removal is inferred');
-console.log('RFID scanner presence/registration regression tests passed');
+  'A one-off read should expire after the short first-miss tolerance');
+
+// The same EPC can reappear as a *new* presence only after it expired.
+scan(a);
+assert.deepEqual([...reader.getPresentEpcs()],[a]);
+const diagnostics=reader.getDiagnostics();
+assert.equal(diagnostics.length,1);
+assert.equal(diagnostics[0].expiryToleranceMs,1500);
+console.log('Continuous reader EPC presence/removal and restock tests passed');
