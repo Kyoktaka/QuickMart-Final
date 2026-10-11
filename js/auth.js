@@ -53,9 +53,17 @@ $('#btn-gmail-received').onclick=async()=>{
   const button=$('#btn-gmail-received');button.disabled=true;
   try{
     await Backend.requestPasswordReset(email);
-    $('#e4').textContent='If registered, a reset link was sent. Open the link from your email to change your password.';
+    // Always use the same generic confirmation, whether or not the email exists.
+    // The API deliberately does not reveal account registration or mail delivery.
+    closeModal('m-auth');
+    openModal('m-reset-confirm');
+    $('#btn-reset-confirm-ok').focus();
   }catch(e){$('#e4').textContent=e.message}
   finally{button.disabled=false}
+};
+$('#btn-reset-confirm-ok').onclick=()=>{
+  closeModal('m-reset-confirm');
+  closeAuth();
 };
 $('#btn-update-password').onclick=async()=>{
   const pass=$('#rs-new').value,confirm=$('#rs-conf').value;
