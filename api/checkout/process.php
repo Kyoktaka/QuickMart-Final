@@ -129,8 +129,8 @@ try {
     $purchaseId = (int) $conn->lastInsertId();
 
     $insertItem = $conn->prepare(
-        'INSERT INTO PURCHASE_items (purchase_id, product_id, unit_price, subtotal) '
-        . 'VALUES (:purchase_id, :product_id, :unit_price, :subtotal)'
+        'INSERT INTO PURCHASE_items (purchase_id, product_id, tag_id, unit_price, subtotal) '
+        . 'VALUES (:purchase_id, :product_id, :tag_id, :unit_price, :subtotal)'
     );
     $markTag = $conn->prepare(
         "UPDATE RFID_tags SET status = 'PURCHASED', purchased_at = NOW() "
@@ -140,6 +140,7 @@ try {
         $insertItem->execute([
             'purchase_id' => $purchaseId,
             'product_id' => $item['product_id'],
+            'tag_id' => $item['tag_id'],
             'unit_price' => $item['price'],
             'subtotal' => $item['price'],
         ]);
