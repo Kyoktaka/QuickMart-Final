@@ -62,7 +62,8 @@ const Backend={
       });
       return {result:'success',reason:'Demo checkout recorded.',purchase:result};
     }catch(e){
-      if(e.status===422&&/QR/i.test(e.message))return{result:'failed',reason:e.message};
+      if(['INVALID_DEMO_QR','DEMO_WALLET_NOT_FOUND','DEMO_INSUFFICIENT_BALANCE']
+        .includes(e.data?.code))return{result:'failed',reason:e.message};
       return {result:'error',reason:e.message};
     }
   },

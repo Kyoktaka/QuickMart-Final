@@ -36,10 +36,20 @@ responds HTTP 503 and will not mark tags purchased.
 For school demo on local server only, configure PHP/Apache:
   QUICKMART_APP_ENV=development
   QUICKMART_DEMO_CHECKOUT=1
-Restart Apache and use QR text:
-  QMPAY|DEMO|C293
-The QR checksum is not a real payment signature. No balance, banking or
-real payment status is verified. This must never be enabled publicly.
+Restart Apache. Use the teammate's classroom QR fixtures:
+  QMPAY|QM-WALLET-1001|C899  (seeded demo balance ₱100,000.00)
+  QMPAY|QM-WALLET-1002|C900  (seeded demo balance ₱0.00)
+The **DEMO_WALLETS** MySQL table holds the simulated balances. Successful
+checkout atomically deducts from the demo wallet, creates purchase records and
+marks the corresponding RFID tags PURCHASED. Insufficient balance never
+marks tags PURCHASED and is recorded by the frontend as a failed attempt.
+The older QMPAY|DEMO|C293 fixture is no longer a registered wallet.
+If using a **fresh database import**, database/schema.sql includes both demo
+wallets automatically; skip migrations. For an existing database only,
+back up then run database/migrations/20261011_demo_wallets.sql once.
+These are **fake wallet balances** for testing, not bank accounts or real
+payment verification. The QR checksum is not a genuine payment signature.
+Never enable this simulation on a public deployment.
 
 ## Transaction History and Dashboard
 

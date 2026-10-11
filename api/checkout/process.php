@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../config/bootstrap.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/demo-qr.php';
 
 require_scan_authorized();
 require_post();
@@ -23,17 +24,13 @@ if (!$demoEnabled) {
 $data = read_json_body();
 // Local DEMO QR check. Not real cryptographic or payment-provider validation.
 $demoQr = is_string($data['payment_qr'] ?? null) ? trim($data['payment_qr']) : '';
-$qrParts = explode('|', $demoQr);
-if (count($qrParts) !== 3 || $qrParts[0] !== 'QMPAY'
-    || preg_match('/^[A-Za-z0-9_-]{1,30}$/D', $qrParts[1]) !== 1) {
-    json_response(['success' => false, 'message' => 'Invalid demonstration QR.'], 422);
-}
-$checkSum = 0;
-foreach (str_split($qrParts[1]) as $character) {
-    $checkSum += ord($character);
-}
-if ($qrParts[2] !== 'C' . ($checkSum % 997)) {
-    json_response(['success' => false, 'message' => 'Invalid demo QR checksum.'], 422);
+$walletId = parse_demo_qr($demoQr);
+if ($walletId === null) {
+    json_response([
+        'success' => false,
+        'code' => 'INVALID_DEMO_QR',
+        'message' => 'Invalid QuickMart demo QR code.'
+    ], 422);
 }
 $sessionId = $data['session_id'] ?? null;
 $input = $data['epcs'] ?? null;
@@ -106,6 +103,46 @@ try {
     }
     $total = number_format($totalCents / 100, 2, '.', '');
 
+    // Server-side demo wallet balance is authoritative. Lock the wallet row so
+    // two simultaneous purchases cannot spend the same demo balance twice.
+    $walletStmt = $conn->prepare(
+        'SELECT wallet_id, balance, status FROM DEMO_WALLETS '
+        . 'WHERE wallet_id = :wallet_id LIMIT 1 FOR UPDATE'
+    );
+    $walletStmt->execute(['wallet_id' => $walletId]);
+    $wallet = $walletStmt->fetch();
+    if (!$wallet || (int) $wallet['status'] !== 1) {
+        $conn->rollBack();
+        json_response([
+            'success' => false,
+            'code' => 'DEMO_WALLET_NOT_FOUND',
+            'message' => 'Demo wallet is not registered or is inactive.'
+        ], 422);
+    }
+    $balanceCents = (int) round((float) $wallet['balance'] * 100);
+    if ($balanceCents < $totalCents) {
+        $conn->rollBack();
+        json_response([
+            'success' => false,
+            'code' => 'DEMO_INSUFFICIENT_BALANCE',
+            'message' => 'Insufficient balance in this demo wallet.'
+        ], 409);
+    }
+
+    // Wallet debit, purchase, purchase items and RFID tag changes commit together.
+    $debitWallet = $conn->prepare(
+        'UPDATE DEMO_WALLETS SET balance = balance - :debit '
+        . 'WHERE wallet_id = :wallet_id AND status = 1 AND balance >= :minimum_balance'
+    );
+    $debitWallet->execute([
+        'debit' => $total,
+        'wallet_id' => $walletId,
+        'minimum_balance' => $total
+    ]);
+    if ($debitWallet->rowCount() !== 1) {
+        throw new DomainException('Demo wallet balance changed. Please retry.');
+    }
+
     $insertPurchase = $conn->prepare(
         "INSERT INTO PURCHASEtbl (admin_id, session_id, status, attempted_items, total_amount) "
         . "VALUES (:admin_id, :session_id, 'SUCCESSFUL', :attempted_items, :total_amount)"
@@ -144,6 +181,7 @@ try {
         'success' => true,
         'message' => 'Demo checkout completed. No real payment was verified.',
         'demo_mode' => true,
+        'demo_wallet_id' => $walletId,
         'session_id' => $sessionId,
         'purchase_id' => $purchaseId,
         'total_items' => count($items),

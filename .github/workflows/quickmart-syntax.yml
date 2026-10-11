@@ -12,3 +12,5 @@ jobs:
       - name: Frontend JavaScript syntax
         run: |
           if [ -d js ]; then find js -type f -name '*.js' -print0 | xargs -0 -n1 node --check; fi
+      - name: Check teammate demo QR fixtures
+        run: php tests/demo-qr.php
