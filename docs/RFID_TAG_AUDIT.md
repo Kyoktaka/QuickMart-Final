@@ -47,11 +47,21 @@ state. Software cannot guarantee a strict 14 × 16 inch platform footprint
 or 12–13 inch detection height. Antenna orientation, transmit power, nearby
 metal, shielding and tag placement all influence the RF field.
 
-The new presence estimator uses a longer initial hold (12 seconds) and a
-6–15 second adaptive grace window based on repeated reads. Items stay in
-the cart across ordinary read gaps and backend lookup failures, but if the
-reader emits an EPC **only once**, the browser still cannot determine whether
-the tag remains on the platform or was removed.
+The presence estimator now follows each EPC's **last repeated read**, not a
+12-second holding window. A first read is held for up to 1.5 seconds, and
+confirmed repeating EPCs use a short adaptive timeout of about 1–2.5 seconds
+(three times the observed per-tag read interval, bounded). If continuous
+USB HID output arrives for a tag, it stays on screen for as long as repeat
+reads continue. When reads stop after physical removal, the display removes
+that EPC after a short tolerance. Actual response time depends on scan cadence.
+
+**Do not assume continuous radio polling means the USB keyboard interface
+emits every repeated EPC.** Some readers report each distinct EPC only once.
+If the reader emits a tag only once and never repeats it, USB HID keystrokes
+cannot prove whether it remains physically inside the read zone. Check
+`RFIDScanner.getDiagnostics()`: a tag's `reads` must increase while it
+remains on the tray. In such a mode, a vendor continuous-output setting or
+reader SDK / status stream is needed for genuine presence/removal monitoring.
 
 To verify true present/removed behavior:
 1. Set reader to continuous inventory / repeat output mode using its actual

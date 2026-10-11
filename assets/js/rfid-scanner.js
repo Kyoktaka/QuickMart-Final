@@ -3,7 +3,10 @@
    This is presence inference, NOT a hardware-defined 14x16-inch read boundary. */
 (() => {
   const KEY_GAP_MS=85,MAX_EPC_LENGTH=100,MIN_EPC_LENGTH=6;
-  const INITIAL_GRACE_MS=12000,MIN_GRACE_MS=6000,MAX_GRACE_MS=15000;
+  // Presence follows ACTUAL repeated EPC reads. No 12-second display hold.
+  // First read: allow brief scan jitter. Continuous reads refresh lastSeen.
+  // Removal: infer after ~1–2.5 seconds without a repeat (hardware-dependent).
+  const FIRST_MISS_MS=1500,MIN_MISS_MS=1000,MAX_MISS_MS=2500;
   const present=new Map();
   let enabled=false,buffer='',timer=null,lastKeyAt=0;
 
@@ -49,8 +52,8 @@
     if(!enabled)return;
     const now=performance.now();let changed=false;
     for(const [epc,meta] of present){
-      const allowance=meta.interval===null?INITIAL_GRACE_MS:
-        Math.max(MIN_GRACE_MS,Math.min(MAX_GRACE_MS,meta.interval*5));
+      const allowance=meta.interval===null?FIRST_MISS_MS:
+        Math.max(MIN_MISS_MS,Math.min(MAX_MISS_MS,meta.interval*3));
       if(now-meta.lastSeen>allowance){present.delete(epc);changed=true}
     }
     if(changed)emitTray();
@@ -81,7 +84,9 @@
     getPresentEpcs:list,
     getDiagnostics:()=>[...present].map(([epc,d])=>({
       epc,reads:d.reads,estimatedReadIntervalMs:d.interval,
-      ageSinceLastReadMs:Math.round(performance.now()-d.lastSeen)
+      ageSinceLastReadMs:Math.round(performance.now()-d.lastSeen),
+      expiryToleranceMs:Math.round(d.interval===null?FIRST_MISS_MS:
+        Math.max(MIN_MISS_MS,Math.min(MAX_MISS_MS,d.interval*3)))
     }))
   };
 })();
