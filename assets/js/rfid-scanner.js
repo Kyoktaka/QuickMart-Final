@@ -3,10 +3,10 @@
    This is presence inference, NOT a hardware-defined 14x16-inch read boundary. */
 (() => {
   const KEY_GAP_MS=85,MAX_EPC_LENGTH=100,MIN_EPC_LENGTH=6;
-  // Presence follows ACTUAL repeated EPC reads. No 12-second display hold.
-  // First read: allow brief scan jitter. Continuous reads refresh lastSeen.
-  // Removal: infer after ~1–2.5 seconds without a repeat (hardware-dependent).
-  const FIRST_MISS_MS=1500,MIN_MISS_MS=1000,MAX_MISS_MS=2500;
+  // Multi-tag reads may arrive in uneven rounds, so don't expire after 1.5s.
+  // Every repeat refreshes lastSeen; absence is inferred from missing events.
+  // These are software tolerances, NOT physical removal signals.
+  const FIRST_MISS_MS=6000,MIN_MISS_MS=4500,MAX_MISS_MS=9000;
   const present=new Map();
   let enabled=false,buffer='',timer=null,lastKeyAt=0;
 
@@ -53,7 +53,7 @@
     const now=performance.now();let changed=false;
     for(const [epc,meta] of present){
       const allowance=meta.interval===null?FIRST_MISS_MS:
-        Math.max(MIN_MISS_MS,Math.min(MAX_MISS_MS,meta.interval*3));
+        Math.max(MIN_MISS_MS,Math.min(MAX_MISS_MS,meta.interval*5));
       if(now-meta.lastSeen>allowance){present.delete(epc);changed=true}
     }
     if(changed)emitTray();
@@ -86,7 +86,7 @@
       epc,reads:d.reads,estimatedReadIntervalMs:d.interval,
       ageSinceLastReadMs:Math.round(performance.now()-d.lastSeen),
       expiryToleranceMs:Math.round(d.interval===null?FIRST_MISS_MS:
-        Math.max(MIN_MISS_MS,Math.min(MAX_MISS_MS,d.interval*3)))
+        Math.max(MIN_MISS_MS,Math.min(MAX_MISS_MS,d.interval*5)))
     }))
   };
 })();

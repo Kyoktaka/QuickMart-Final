@@ -52,7 +52,7 @@ assert.equal(events.filter(e=>e.type==='rfid:epc').length,2,
 
 // After the tags are physically removed, no further EPC reads arrive.
 // Expiry is inferred rapidly; we deliberately do NOT wait 12 seconds.
-now+=2700;intervalFn();
+now+=10000;intervalFn();
 assert.deepEqual([...reader.getPresentEpcs()],[],
   'Both tags must disappear promptly after the stream stops');
 reader.disable();
@@ -61,13 +61,13 @@ assert.equal(events.at(-1).type,'rfid:tray');
 assert.equal(events.filter(e=>e.type==='rfid:epcs').length,0,
   'Tray snapshots must never bulk-register EPCs in Restock mode');
 
-// One read without any following repeat also must not linger for 12 seconds.
+// One-shot USB HID output is not proof of physical presence. It will eventually time out.
 reader.enable();
 scan(a);
-now+=1000;intervalFn();
+now+=4000;intervalFn();
 assert.deepEqual([...reader.getPresentEpcs()],[a],
   'Allow short read gaps without instant flicker');
-now+=600;intervalFn();
+now+=2300;intervalFn();
 assert.deepEqual([...reader.getPresentEpcs()],[],
   'A one-off read should expire after the short first-miss tolerance');
 
@@ -76,5 +76,5 @@ scan(a);
 assert.deepEqual([...reader.getPresentEpcs()],[a]);
 const diagnostics=reader.getDiagnostics();
 assert.equal(diagnostics.length,1);
-assert.equal(diagnostics[0].expiryToleranceMs,1500);
+assert.equal(diagnostics[0].expiryToleranceMs,6000);
 console.log('Continuous reader EPC presence/removal and restock tests passed');

@@ -8,16 +8,18 @@ require_once __DIR__ . '/../../includes/demo-qr.php';
 require_scan_authorized();
 require_post();
 
-// There is no payment-provider verification integration yet.
-// A browser 'qr:scanned' event must NEVER authorize a real purchase.
-// School demo checkout is available only by explicit server opt-in and on loopback.
-$demoEnabled = getenv('QUICKMART_APP_ENV') === 'development'
-    && getenv('QUICKMART_DEMO_CHECKOUT') === '1'
-    && in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+// Local classroom simulation is enabled automatically ONLY on the XAMPP
+// loopback host. Production and LAN requests always fail closed.
+$demoEnabled = quickmart_local_demo_allowed(
+    (string)($_SERVER['REMOTE_ADDR'] ?? ''),
+    (string)($_SERVER['HTTP_HOST'] ?? ''),
+    getenv('QUICKMART_APP_ENV'),
+    getenv('QUICKMART_DEMO_CHECKOUT')
+);
 if (!$demoEnabled) {
     json_response([
         'success' => false,
-        'message' => 'Real payment confirmation is not configured. Checkout is disabled; ask the developer to enable local demo mode.'
+        'message' => 'Classroom QR checkout is available on localhost only. No real payment provider is connected.'
     ], 503);
 }
 

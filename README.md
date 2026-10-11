@@ -25,18 +25,20 @@ The assets/js/rfid-scanner.js handler captures EPCs from the USB HID
 keyboard-emulation UHF reader. Inventory modal registers EPCs using PHP API.
 Kiosk scan calls PHP detect endpoint and builds grouped cart items. No local
 stock deduction occurs. Only committed backend checkout marks EPCs PURCHASED.
-Tag presence is approximated via a 3-second grace timeout; test on hardware.
+Tag presence is estimated from repeated EPC reads with a brief configurable grace interval; verify actual USB output on the target hardware.
 Manager start/exit verification uses the password auth backend; demo RFID
 manager card and master-key tricks are disabled.
 
 ## Local demonstration QR checkout ONLY
 
-Real payment is NOT integrated. Without explicit demo flags, the checkout API
-responds HTTP 503 and will not mark tags purchased.
-For school demo on local server only, configure PHP/Apache:
-  QUICKMART_APP_ENV=development
-  QUICKMART_DEMO_CHECKOUT=1
-Restart Apache, then test the two fixed teammate QR codes:
+Real payment is NOT integrated. For **http://localhost/QuickMart-Final/**,
+the classroom QR simulation is available automatically without extra environment
+variables. It is blocked on remote/LAN/public hosts, in production mode, or
+when QUICKMART_DEMO_CHECKOUT=0. Do not expose this simulation publicly.
+If you still see "checkout unavailable", ensure the browser is using localhost
+(not a LAN IP), Apache was restarted, and the latest PHP files were pulled.
+The backend recognizes the TWO fixed QR payloads only, not a live payment app.
+Scan the two fixed teammate QR codes:
   QMPAY|QM-WALLET-1001|C899   => demo success (enough balance scenario)
   QMPAY|QM-WALLET-1002|C900   => demo failure (insufficient balance scenario)
 These two scenarios are hardcoded SERVER-SIDE in includes/demo-qr.php.
@@ -48,7 +50,7 @@ Unrecognized QR codes are also treated as failed attempts in this demo.
 The old QMPAY|DEMO|C293 fixture is no longer accepted.
 
 A classroom QR is not a real payment method or fraud-resistant signature.
-Always leave demo mode disabled except for local school testing.
+It is automatically restricted to local browser/XAMPP testing only.
 No new database migration or ERD change is required for this option.
 
 ## Transaction History and Dashboard
@@ -64,16 +66,24 @@ PHPMailer SMTP, reader hardware, camera or browser flow testing.
 
 ## RFID restocking and scan stability
 
-Restock is deliberately **one tag per explicit scan**. Select the product,
-keep other tags out of the reader field, click Start Scan, and present
-just one EPC. After registration, the reader pauses; remove that tag
-before clicking Scan Next Tag for the following product.
+Restock supports **BATCH RFID registration**: select ONE product, click
+Start Scanning, present several physical tags for that same product,
+click Stop Scanning, review the unique EPCs, and confirm Register N Tags.
+The PHP backend inserts available unique tags for the selected product.
+Changing the product discards the pending scan; nothing auto-reassigns tags
+that are already owned by another product. A batch supports up to 100 tags.
+Keep unrelated products away from the scanner during that product's batch.
 Existing incorrect assignments are **not** automatically changed.
 Use docs/RFID_TAG_AUDIT.md to inspect and correct verified EPCs.
 
-The HID reader reports scans, not exact physical presence. The browser
-holds readings through short gaps and estimates removal when repeat scans
-stop. Stable hold requires continuous inventory output from the reader.
+The HID reader reports EPC reads, not an authoritative in/out presence flag.
+Short gaps between multi-tag reads are tolerated (first-read 6-second window,
+adaptive 4.5–9-second window after repeats; plus brief empty-tray settling).
+The cart remains as long as the device keeps reporting each tag. If the reader
+only outputs an EPC once or periodically skips a still-present tag for longer,
+the web page cannot know it remains in range; configure the reader for repeated
+HID EPC output or use a vendor inventory API. Software cannot guarantee both
+zero false-removals and instant physical removal from single-shot key events.
 The requested 14x16-inch platform and 12–13-inch height are *physical RF*
 constraints: tune and test the antenna/reader, not just the JavaScript timer.
 

@@ -47,21 +47,20 @@ state. Software cannot guarantee a strict 14 × 16 inch platform footprint
 or 12–13 inch detection height. Antenna orientation, transmit power, nearby
 metal, shielding and tag placement all influence the RF field.
 
-The presence estimator now follows each EPC's **last repeated read**, not a
-12-second holding window. A first read is held for up to 1.5 seconds, and
-confirmed repeating EPCs use a short adaptive timeout of about 1–2.5 seconds
-(three times the observed per-tag read interval, bounded). If continuous
-USB HID output arrives for a tag, it stays on screen for as long as repeat
-reads continue. When reads stop after physical removal, the display removes
-that EPC after a short tolerance. Actual response time depends on scan cadence.
+The presence estimator follows each EPC's **last repeated read**.
+For multiple tags, it now tolerates up to roughly 6 seconds after a first
+read, then 4.5–9 seconds after repeated read measurements. These are
+software debounce windows, NOT guaranteed physical presence or removal.
+A 1.5-second expiry previously caused flicker when tags were scanned in
+uneven batches. A missing tag is dropped only after its read stream stops
+for the configured grace period. The kiosk adds a brief settling interval
+before clearing an entirely empty tray.
 
-**Do not assume continuous radio polling means the USB keyboard interface
-emits every repeated EPC.** Some readers report each distinct EPC only once.
-If the reader emits a tag only once and never repeats it, USB HID keystrokes
-cannot prove whether it remains physically inside the read zone. Check
-`RFIDScanner.getDiagnostics()`: a tag's `reads` must increase while it
-remains on the tray. In such a mode, a vendor continuous-output setting or
-reader SDK / status stream is needed for genuine presence/removal monitoring.
+If the USB HID device emits an EPC **only once**, no software-only algorithm
+can distinguish an item left on the reader from one physically removed.
+Check `RFIDScanner.getDiagnostics()` and verify that the `reads` counter
+for each EPC continues increasing. Configure continuous duplicate EPC
+output in the actual vendor tool if the device supports it.
 
 To verify true present/removed behavior:
 1. Set reader to continuous inventory / repeat output mode using its actual
@@ -73,5 +72,5 @@ To verify true present/removed behavior:
 4. Adjust RF power or antenna placement in the hardware configuration to
    approximate the target detection zone; do not rely on CSS or JavaScript
    pixels to control the antenna field.
-5. Remove a tag and observe the grace interval before the item disappears.
+5. Remove a tag and observe the grace interval before it disappears.
    Ensure other EPCs remain in the kiosk cart during the experiment.
