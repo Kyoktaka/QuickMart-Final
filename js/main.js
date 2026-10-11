@@ -11,6 +11,7 @@ window.QuickMart={state,renderAll,refreshAll,addActivity:pushActivity,
   setSalesChart(r,labels,data){chartData[r]={labels,data};renderChart()}};
 async function initQuickMart(){
   document.body.classList.add('locked');
+  if(openPasswordResetLink())return;
   try{
     const res=await Backend.me();
     if(!res.authenticated)return;

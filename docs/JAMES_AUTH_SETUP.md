@@ -15,7 +15,7 @@ This implementation works with the current six-table `database/schema.sql` and d
    - Optional: `QUICKMART_SMTP_HOST` (defaults to `smtp.gmail.com`), `QUICKMART_SMTP_PORT` (defaults to `587`)
 
    Restart Apache after changing its environment. Do not place live credentials in `config/mail.php` or commit them to GitHub.
-5. Use the existing secure initial-account setup process. Follow its requirements for `QUICKMART_ALLOW_SETUP` and disable setup immediately after creating the first manager account.
+5. On localhost, use the frontend **Create Account** form backed by `api/auth/signup.php` to create the first manager. Further account signup is blocked when any manager exists. The legacy `manager/setup-account.php` file has been removed.
 
 ## API contracts
 

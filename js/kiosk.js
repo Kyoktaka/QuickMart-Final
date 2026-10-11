@@ -70,6 +70,8 @@ $('#btn-start-scan').onclick=()=>openAuth(enterKiosk,2,true);
 $('#btn-kiosk-exit').onclick=()=>openAuth(exitKiosk,2,true);
 window.addEventListener('rfid:tray',async e=>{
   if(!state.kioskOn||(!$('#k-idle').classList.contains('on')&&!$('#k-cart').classList.contains('on')))return;
+  // Disabling the scanner for password entry clears its cache. That is not tag removal.
+  if(window.RFIDScanner&&!RFIDScanner.isEnabled())return;
   const epcs=[...new Set((e.detail||[]).map(v=>String(v).trim().toUpperCase()))];
   const revision=++trayRevision;
   if(!epcs.length){state.cart=[];state.current=null;renderCart();screen('k-idle');return}
@@ -88,7 +90,9 @@ window.addEventListener('rfid:tray',async e=>{
     renderCart();screen('k-cart');
   }catch(error){
     if(revision!==trayRevision)return;
-    state.cart=[];state.current=null;renderCart();screen('k-idle');toast(error.message);
+    // Database/connection failures are NOT evidence that a product was removed.
+    // Preserve the last verified tray to prevent flashing/disappearing items.
+    toast('RFID detection delayed: '+error.message);
   }
 });
 $('#btn-checkout').onclick=()=>{

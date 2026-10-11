@@ -26,6 +26,7 @@ const Backend={
     return post('api/auth/signup.php',{admin_name:username,email,password});
   },
   async requestPasswordReset(email){return post('api/auth/forgot-password.php',{email})},
+  async resetPassword(token,password){return post('api/auth/reset-password.php',{token,password})},
   async verifyPassword(password){return post('api/auth/verify-password.php',{password})},
   async revokeScan(){return post('api/auth/revoke-scan.php',{})},
   async loadProducts(){const r=await apiRequest('api/products/list.php?include_inactive=1');

@@ -101,54 +101,81 @@ function fillEpc(){
   $('#epc-price').value=peso(p.price);$('#epc-code').value='';
   $('#ee').textContent='';
 }
-const epcSeen=new Set(),epcInFlight=new Set();
+/* ONE-TAG RESTOCKING. A tray snapshot must NEVER be bulk-assigned to the selected product. */
+let restockArmed=false,restockBusy=false;
+const registeredDuringModal=new Set();
+function disarmRestock(){
+  restockArmed=false;
+  if(window.RFIDScanner)RFIDScanner.disable();
+}
 function openEpc(id){
   const products=state.products.filter(p=>p.active!==false);
   if(!products.length)return toast('Add or activate a product first');
+  disarmRestock();
   $('#epc-product').innerHTML=products.map(p=>
     '<option value="'+p.id+'">'+esc(p.name)+'</option>').join('');
   if(id)$('#epc-product').value=id;
-  epcSeen.clear();epcInFlight.clear();fillEpc();openModal('m-epc');
-  if(window.RFIDScanner)RFIDScanner.enable();
+  registeredDuringModal.clear();restockBusy=false;
+  fillEpc();openModal('m-epc');
+  $('#epc-arm').textContent='Start Scan';
+  $('#ee').textContent='Select ONE product, keep other tags away, then click Start Scan.';
 }
 $('#btn-epc-mode').onclick=()=>openEpc();
 $('#epc-product').onchange=()=>{
-  epcSeen.clear();epcInFlight.clear();fillEpc();
+  disarmRestock();
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  fillEpc();$('#epc-arm').disabled=false;
+  $('#epc-arm').textContent='Start Scan';
+  $('#ee').textContent='Remove other tags, then click Start Scan for this product.';
 };
-$$('#m-epc [data-close]').forEach(b=>b.addEventListener('click',()=>{
-  if(window.RFIDScanner)RFIDScanner.disable();
-}));
-async function registerSeenEpcs(input){
-  if(!$('#m-epc').classList.contains('on'))return;
-  const p=state.products.find(x=>x.id===Number($('#epc-product').value));
+$('#epc-arm').onclick=()=>{
+  if(restockBusy)return;
+  disarmRestock();
+  const product=state.products.find(x=>x.id===Number($('#epc-product').value));
+  if(!product)return $('#ee').textContent='Select a product first.';
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  restockArmed=true;$('#epc-arm').textContent='Waiting for tag…';
+  $('#ee').textContent='Ready for ONE new EPC for '+product.name+'. Keep other tags away.';
+  if(window.RFIDScanner)RFIDScanner.enable();
+  else $('#ee').textContent='RFID hardware reader is not available.';
+};
+$$('#m-epc [data-close]').forEach(b=>b.addEventListener('click',disarmRestock));
+window.addEventListener('rfid:epc',async event=>{
+  if(!restockArmed||restockBusy||!$('#m-epc').classList.contains('on'))return;
+  const selectedId=Number($('#epc-product').value);
+  const p=state.products.find(x=>x.id===selectedId);
   if(!p||p.active===false)return;
-  const epcs=[...new Set(input.map(x=>String(x).trim().toUpperCase()))]
-    .filter(x=>x&&!epcSeen.has(x)&&!epcInFlight.has(x));
-  if(!epcs.length)return;
-  epcs.forEach(x=>epcInFlight.add(x));
-  const selectedId=p.id;
+  const epc=String(event.detail||'').trim().toUpperCase();
+  if(!epc||registeredDuringModal.has(epc))return;
+  // Stop capture BEFORE awaiting HTTP. Only one EPC can be bound per explicit scan.
+  restockBusy=true;disarmRestock();$('#epc-arm').disabled=true;
+  $('#epc-code').value=epc;
+  $('#ee').textContent='Verifying tag with the database…';
   try{
-    const result=await Backend.registerEpcs(selectedId,epcs);
-    const good=result.registered_epcs||[];
-    const same=result.already_registered_epcs||[];
-    const other=result.already_registered_other_product_epcs||[];
-    epcs.forEach(x=>{
-      if(good.includes(x)||same.includes(x)||other.includes(x))epcSeen.add(x);
-    });
-    if(selectedId===Number($('#epc-product').value)){
-      $('#epc-code').value=epcs[epcs.length-1];
-      $('#ee').textContent=other.length?'Some EPCs are assigned to other products.':
-        same.length?'Some EPCs were already registered.':'';
+    const r=await Backend.registerEpcs(selectedId,[epc]);
+    const added=(r.registered_epcs||[]).includes(epc);
+    const same=(r.already_registered_epcs||[]).includes(epc);
+    const other=(r.already_registered_other_product_epcs||[]).includes(epc);
+    registeredDuringModal.add(epc);
+    if(added){
+      state.products=await Backend.loadProducts();renderInventory();
+      if(selectedId===Number($('#epc-product').value)){
+        const updated=state.products.find(x=>x.id===selectedId);
+        if(updated)$('#epc-stock').value=updated.stock;
+      }
+      pushActivity('RFID tag registered - '+p.name);
+      $('#ee').textContent='Registered to '+p.name+'. Move the tag away before scanning another.';
+      toast('Stock +1 for '+p.name);
+    }else if(other){
+      $('#ee').textContent='Tag already belongs to ANOTHER product. Not reassigned. Check RFID records.';
+    }else if(same){
+      $('#ee').textContent='This tag is already registered to '+p.name+'. No stock added.';
+    }else{
+      $('#ee').textContent='Tag was not registered. Review the response and try again.';
     }
-    if(good.length){
-      const products=await Backend.loadProducts();state.products=products;
-      renderInventory();fillEpc();
-      $('#epc-code').value=epcs[epcs.length-1];
-      pushActivity('EPCs assigned - '+good.length+' to '+p.name);
-      toast(good.length+' RFID tag(s) registered. Stock updated.');
-    }
-  }catch(e){$('#ee').textContent=e.message}
-  finally{epcs.forEach(x=>epcInFlight.delete(x))}
-}
-window.addEventListener('rfid:epcs',e=>registerSeenEpcs(e.detail||[]));
-window.addEventListener('rfid:epc',e=>registerSeenEpcs([e.detail]));
+  }catch(error){$('#ee').textContent=error.message}
+  finally{
+    restockBusy=false;$('#epc-arm').disabled=false;
+    $('#epc-arm').textContent='Scan Next Tag';
+  }
+});
