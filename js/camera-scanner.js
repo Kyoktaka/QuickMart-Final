@@ -54,11 +54,13 @@ async function startCameraScanner(){
   console.error('Camera start failed:',lastErr);
   giveUp(camText(lastErr));
 }
-$('#btn-cam-retry').onclick=startCameraScanner;
+$('#btn-cam-retry').onclick=()=>{startTimer();startCameraScanner()};
 function beep(){try{const c=new (window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(c.destination);o.start();setTimeout(()=>{o.stop();c.close()},100)}catch(e){}}
 async function onQrDecoded(text){
   if(state.processing||!onScreen('k-qr'))return;
   state.processing=true;
+  stopTimer(); // Wait for the server before classifying timeout/failure.
+  $('#btn-cancel-scan').disabled=true;
   const status=$('#qr-status');status.textContent='QR detected — verifying…';status.className='qr-status';
   try{navigator.vibrate&&navigator.vibrate(80)}catch(e){}
   beep();
@@ -74,6 +76,6 @@ async function onQrDecoded(text){
       status.textContent='Checkout unavailable: '+r.reason;status.className='qr-status bad';
       stopTimer();$('#btn-cam-retry').style.display='';
     }
-  }finally{state.processing=false}
+  }finally{state.processing=false;$('#btn-cancel-scan').disabled=false}
 }
 window.addEventListener('qr:decoded',e=>onQrDecoded(e.detail));

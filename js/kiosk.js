@@ -58,6 +58,7 @@ async function enterKiosk(){
   pushActivity('Customer scanning terminal started.');
 }
 async function exitKiosk(){
+  if(state.processing){toast('Checkout is being verified. Please wait.');return}
   if(state.current&&state.cart.length&&!loggedSessions.has(state.current)){
     await finalize('cancelled','Scanning session exited.');
   }

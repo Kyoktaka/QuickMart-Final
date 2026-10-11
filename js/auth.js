@@ -7,9 +7,16 @@ function authStep(n){
 function openAuth(cb,step=2,passwordOnly=true){
   state.authCb=cb;authPasswordOnly=true;
   ['#auth-pw','#auth-mk','#rs-gmail','#rs-new','#rs-conf'].forEach(s=>$(s).value='');
+  if(window.RFIDScanner)RFIDScanner.disable();
   authStep(step===4?4:2);openModal('m-auth');
 }
-function closeAuth(){closeModal('m-auth');state.authCb=null;resetFromLogin=false;authPasswordOnly=false}
+function closeAuth(){
+  closeModal('m-auth');state.authCb=null;resetFromLogin=false;authPasswordOnly=false;
+  if(window.RFIDScanner&&state.kioskOn&&
+     ($('#k-idle').classList.contains('on')||$('#k-cart').classList.contains('on'))){
+    RFIDScanner.enable();
+  }
+}
 $('#btn-pw').onclick=async()=>{
   const v=$('#auth-pw').value;
   if(!v)return $('#e2').textContent='Enter your password.';
