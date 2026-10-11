@@ -1,0 +1,9 @@
+{
+    "name": "quickmart/rfid-checkout-backend",
+    "description": "QuickMart RFID checkout backend - manager email recovery dependency",
+    "type": "project",
+    "require": {
+        "php": "^8.1",
+        "phpmailer/phpmailer": "^6.9"
+    }
+}
