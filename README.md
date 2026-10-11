@@ -61,3 +61,27 @@ Activity Feed remains temporary browser memory; it is NOT permanent audit loggin
 
 GitHub Actions checks PHP/JS syntax. This does not replace live XAMPP/MySQL,
 PHPMailer SMTP, reader hardware, camera or browser flow testing.
+
+## RFID restocking and scan stability
+
+Restock is deliberately **one tag per explicit scan**. Select the product,
+keep other tags out of the reader field, click Start Scan, and present
+just one EPC. After registration, the reader pauses; remove that tag
+before clicking Scan Next Tag for the following product.
+Existing incorrect assignments are **not** automatically changed.
+Use docs/RFID_TAG_AUDIT.md to inspect and correct verified EPCs.
+
+The HID reader reports scans, not exact physical presence. The browser
+holds readings through short gaps and estimates removal when repeat scans
+stop. Stable hold requires continuous inventory output from the reader.
+The requested 14x16-inch platform and 12–13-inch height are *physical RF*
+constraints: tune and test the antenna/reader, not just the JavaScript timer.
+
+## Authentication / password reset UI
+
+The front-end Create Account form creates the **first manager account only**;
+the redundant manager/setup-account.php has been removed.
+Password reset links return to index.html and open the **existing QuickMart
+Set New Password modal** using a one-time, expiring server token. The
+previous standalone reset-password.html forwards old bookmarks to the
+same UI. No change was made to CSS or the original design.

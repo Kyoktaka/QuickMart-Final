@@ -3,6 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<script>
+  // Strip emailed reset tokens from the address bar before loading external assets.
+  (()=>{const u=new URL(location.href);const t=u.searchParams.get('reset_token');
+    if(!t)return;window.__quickmartPendingResetToken=t;
+    u.searchParams.delete('reset_token');
+    history.replaceState(null,'',u.pathname+u.search+u.hash);
+  })();
+</script>
 <title>QuickMart – Self-Checkout & RFID Management</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -233,7 +242,7 @@
   <div class="fg"><label>Price</label><input id="epc-price" readonly></div>
   <div class="fg"><label>EPC code</label><input id="epc-code" readonly placeholder="Waiting for scan…"></div>
   <div class="err" id="ee"></div>
-  <div class="mfoot"><button class="btn ghost" data-close="m-epc">Close</button></div>
+  <div class="mfoot"><button class="btn ghost" data-close="m-epc">Close</button><button class="btn" id="epc-arm" type="button">Start Scan</button></div>
 </div></div>
 
 <!-- KIOSK -->
