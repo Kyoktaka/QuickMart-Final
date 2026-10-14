@@ -85,8 +85,9 @@
   <div class="fg"><label>Current stock</label><input id="epc-stock" readonly></div>
   <div class="fg"><label>Price</label><input id="epc-price" readonly></div>
   <div class="fg"><label>EPC code</label><input id="epc-code" readonly placeholder="Scan or enter an EPC tag…"></div>
+  <div class="hint" id="epc-captured" aria-live="polite">No EPCs captured yet.</div>
   <div class="err" id="ee"></div>
-  <div class="mfoot"><button class="btn ghost" data-close="m-epc">Close</button></div>
+  <div class="mfoot"><button class="btn ghost" data-close="m-epc">Close</button><button class="btn ghost" type="button" id="epc-clear">Clear</button><button class="btn" type="button" id="epc-arm">Start Scanning</button></div>
 </div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -94,6 +95,7 @@
 <script src="js/state.js"></script>
 <script src="js/backend.js"></script>
 <script src="js/helpers.js"></script>
+<script src="assets/js/rfid-scanner.js"></script>
 <script src="js/inventory.js"></script>
 <script src="js/main.js"></script>
 </body>

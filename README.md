@@ -41,10 +41,28 @@ longer reference `size`.
 - Sync your ERD with the implementation: remove `PRODUCTtbl.size` and show
   `PRODUCTtbl.description`. Available stock is computed from RFID tags.
 
-The final new multi-page frontend package is a **separate overlay** and has not
-been pushed into this repository by this backend-only change; its
-`js/backend.js` also needs the no-`size` adapter included in the updated
-integration ZIP. Applying the ZIP must never replace the PHP endpoints or schema.
+## Final frontend integration (October 14, 2026)
+
+The team-provided `quickmart` multi-page design is now the active frontend at
+repository root. `index.html` forwards to `login.html`; the `js/backend.js`
+adapter uses the existing PHP/MySQL APIs. All 18 original frontend CSS files
+and the login background asset were preserved byte-for-byte.
+
+Manager login, product updates, RFID EPC registration and live detection,
+kiosk checkout, dashboard reporting, purchase history and reset-password
+forms now call the server. The old demo storage and demo payment flows are
+not used. The only new PHP endpoint is `api/rfid/list.php`, for authenticated
+RFID status lookup. No database tables or columns are added by this merge.
+
+Before launching on an existing database, first back up the database and apply
+`database/migrations/20261014_product_description_remove_size.sql` once.
+For a fresh install, import `database/schema.sql` instead. See the earlier
+product description migration instructions above.
+
+Run `node tests/integration-smoke.js` and `php -l api/rfid/list.php` for
+syntax/contract smoke tests. Live MySQL, camera, SMTP and physical RFID reader
+must still be checked locally. QR payments are classroom-only, localhost-only
+fixtures and are not a real payment gateway.
 
 ## RFID integration
 

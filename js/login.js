@@ -1,58 +1,44 @@
-/* ===== LOGIN AND FIRST MANAGER SIGNUP ===== */
-function switchLoginForm(id){
-  $$('.lg-form').forEach(f=>f.classList.remove('active'));
-  $('#'+id).classList.add('active');
+/* Final frontend login animations, backed by PHP auth (no demo passwords). */
+function switchLoginForm(formId){
+  const cur=$('.lg-form.active'),next=$('#'+formId);
   $('#login-err').textContent='';$('#signup-err').textContent='';
+  if(cur===next)return;
+  const swap=()=>{$$('.lg-form').forEach(f=>f.classList.remove('active','out'));next.classList.add('active')};
+  if(!cur)return swap();cur.classList.add('out');setTimeout(swap,230);
 }
+function shakeForm(id){const f=$('#'+id);f.classList.remove('shake');void f.offsetWidth;f.classList.add('shake');setTimeout(()=>f.classList.remove('shake'),500)}
+function transitionIn(){sessionStorage.setItem(SS_AUTH,'1');sessionStorage.setItem(SS_FRESH,'1');
+  $('#login').classList.add('leaving');setTimeout(()=>location.replace('dashboard.html'),520)}
 $('#link-to-signup').onclick=e=>{e.preventDefault();switchLoginForm('signup-form')};
 $('#link-to-login').onclick=e=>{e.preventDefault();switchLoginForm('login-form')};
 $('#signup-form').onsubmit=async e=>{
-  e.preventDefault();
-  const name=$('#signup-user').value.trim(),email=$('#signup-email').value.trim();
-  const pass=$('#signup-pass').value,conf=$('#signup-conf').value,err=$('#signup-err');
+  e.preventDefault();const user=$('#signup-user').value.trim(),email=$('#signup-gmail').value.trim();
+  const pass=$('#signup-pass').value,conf=$('#signup-conf').value,err=$('#signup-err'),btn=$('#btn-signup');
   err.style.color='var(--bad)';err.textContent='';
-  if(!name||!email||!pass||!conf)return err.textContent='Complete all required fields.';
-  if(pass.length<8)return err.textContent='Password must be at least 8 characters.';
+  if(!user||!email||!pass||!conf)return shakeForm('signup-form'),err.textContent='Complete all fields.';
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return err.textContent='Enter a valid email address.';
+  if(new TextEncoder().encode(pass).length<8||new TextEncoder().encode(pass).length>72)return err.textContent='Password must contain 8–72 bytes.';
   if(pass!==conf)return err.textContent='Passwords do not match.';
-  const button=$('#btn-signup');button.disabled=true;
-  try{
-    await Backend.signup(name,email,pass);
-    err.style.color='var(--ok)';err.textContent='Manager created! Sign in using your email.';
-    $('#login-user').value=email;
-    setTimeout(()=>{switchLoginForm('login-form');$('#login-user').value=email},1200);
-  }catch(e){err.textContent=e.message}
-  finally{button.disabled=false}
+  btn.disabled=true;
+  try{await Backend.signup(user,email,pass);err.style.color='var(--ok)';err.textContent='Manager created. Sign in with your email.';
+    setTimeout(()=>{switchLoginForm('login-form');$('#login-user').value=email},1300)}
+  catch(e){err.textContent=e.message;shakeForm('signup-form')}
+  finally{btn.disabled=false}
 };
 $('#login-form').onsubmit=async e=>{
-  e.preventDefault();
-  const email=$('#login-user').value.trim(),pass=$('#login-pass').value,err=$('#login-err');
+  e.preventDefault();const email=$('#login-user').value.trim(),pass=$('#login-pass').value,err=$('#login-err'),btn=$('#btn-login');
   if(!email||!pass)return err.textContent='Enter manager email and password.';
-  const button=$('#btn-login');button.disabled=true;err.textContent='';
-  try{
-    await Backend.login(email,pass);
-    await refreshAll();
-    document.body.classList.remove('locked');goTab('dashboard');
-  }catch(e){err.textContent=e.message}
-  finally{button.disabled=false}
+  btn.disabled=true;btn.classList.add('loading');err.textContent='';
+  try{await Backend.login(email,pass);transitionIn()}
+  catch(e){err.style.color='var(--bad)';err.textContent=e.message;shakeForm('login-form')}
+  finally{btn.disabled=false;btn.classList.remove('loading')}
 };
-function eye(button,input){
-  $(button).onclick=()=>{const el=$(input),show=el.type==='password';
-    el.type=show?'text':'password';$(button).setAttribute('aria-label',show?'Hide password':'Show password')};
-}
-eye('#login-eye','#login-pass');eye('#signup-eye','#signup-pass');
+const eye=(btn,input)=>$(btn).onclick=()=>{
+  const i=$(input),b=$(btn),show=i.type==='password';i.type=show?'text':'password';
+  b.classList.toggle('is-open',show);b.classList.toggle('is-closed',!show);
+  b.setAttribute('aria-label',show?'Hide password':'Show password');b.innerHTML=show?EYE_OPEN:EYE_CLOSED;
+};
+eye('#login-eye','#login-pass');eye('#signup-eye','#signup-pass');eye('#signup-conf-eye','#signup-conf');
 $('#btn-forgot-login').onclick=()=>{resetFromLogin=true;openAuth(null,4)};
-function lock(){
-  state.kioskOn=false;state.manager=null;state.products=[];state.sessions=[];state.dashboard=null;
-  $('#kiosk').classList.remove('on');resetKiosk();
-  $$('.modal').forEach(m=>m.classList.remove('on'));
-  document.body.classList.add('locked');
-  ['#login-user','#login-pass','#signup-user','#signup-email','#signup-pass','#signup-conf']
-    .forEach(s=>$(s).value='');
-  $('#login-pass').type='password';$('#signup-pass').type='password';
-  switchLoginForm('login-form');
-}
-$('#btn-logout').onclick=async()=>{
-  try{await Backend.revokeScan()}catch(e){}
-  try{await Backend.logout()}catch(e){toast('Logout request failed. Please retry.');return}
-  lock();
-};
+// Token is stripped as early as possible to avoid exposing it to third-party scripts.
+openPasswordResetLink();

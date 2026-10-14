@@ -1,23 +1,29 @@
-/* ===== APP STARTUP AND SERVER-SIDE REFRESH ===== */
-function renderAll(){renderInventory();renderHistory();renderDashboard()}
+/* Page-specific live DB bootstrap. No localStorage authentication or product data. */
 async function refreshAll(){
-  const [products,sessions,dashboard]=await Promise.all([
-    Backend.loadProducts(),Backend.loadSessions(),Backend.loadDashboard()
-  ]);
-  state.products=products;state.sessions=sessions;state.dashboard=dashboard;
-  renderAll();
+  const result=await Promise.all([Backend.loadProducts(),Backend.loadSessions(),Backend.loadDashboard()]);
+  [state.products,state.sessions,state.dashboard]=result;
+  if($('#tab-inventory'))state.tags=await Backend.loadTags();
+  window.PAGE_RENDER&&window.PAGE_RENDER();
 }
-window.QuickMart={state,renderAll,refreshAll,addActivity:pushActivity,
-  setSalesChart(r,labels,data){chartData[r]={labels,data};renderChart()}};
-async function initQuickMart(){
-  document.body.classList.add('locked');
-  if(openPasswordResetLink())return;
+window.QuickMart={state,refreshAll,addActivity:pushActivity};
+(async()=>{
+  if($('#login')){
+    // Keep login background and modals as designed even if already authenticated.
+    return;
+  }
   try{
-    const res=await Backend.me();
-    if(!res.authenticated)return;
-    state.manager=res.manager;
+    const auth=await Backend.me();
+    if(!auth.authenticated){sessionStorage.removeItem(SS_AUTH);sessionStorage.removeItem(SS_KIOSK);location.replace('login.html');return}
+    state.manager=auth.manager;
+    sessionStorage.setItem(SS_AUTH,'1');
+    if($('#user-name'))$('#user-name').textContent=auth.manager.manager_name||'Manager';
+    const logoutButton=$('#btn-logout');if(logoutButton)logoutButton.onclick=logout;
+    if($('#kiosk')){
+      [state.products,state.tags]=await Promise.all([Backend.loadProducts(),Backend.loadTags()]);
+      state.kioskOn=true;screen('k-idle');return
+    }
     await refreshAll();
-    document.body.classList.remove('locked');goTab('dashboard');
-  }catch(e){console.warn('Could not restore session:',e.message)}
-}
-initQuickMart();
+    if(sessionStorage.getItem(SS_FRESH)){sessionStorage.removeItem(SS_FRESH);document.body.classList.add('app-in');setTimeout(()=>document.body.classList.remove('app-in'),950)}
+  }catch(e){toast('Could not load QuickMart: '+e.message,'error');
+    if(e.status===401)location.replace('login.html')}
+})();

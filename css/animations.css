@@ -1,22 +1,33 @@
-/* --- ANIMATIONS --- */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(15px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes pulseGlow {
-  0% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(255, 107, 0, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0); }
-}
-@keyframes scanLine {
-  0% { top: 8%; }
-  100% { top: 92%; }
-}
-@keyframes countUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+/* animations.css */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulseGlow{0%{box-shadow:0 0 0 0 rgba(255,107,0,.4)}70%{box-shadow:0 0 0 10px rgba(255,107,0,0)}100%{box-shadow:0 0 0 0 rgba(255,107,0,0)}}
+@keyframes scanLine{0%{top:8%}100%{top:92%}}
+@keyframes countUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes qmLoginIn{from{opacity:0}to{opacity:1}}
+@keyframes qmLoginOut{to{opacity:0;transform:scale(1.05)}}
+@keyframes qmCardIn{from{opacity:0;transform:translateY(26px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes qmCardOut{to{opacity:0;transform:translateX(-28px) scale(.98)}}
+@keyframes qmShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-7px)}40%,60%{transform:translateX(7px)}}
+@keyframes qmBrandIn{from{opacity:0;transform:translateX(-56px)}to{opacity:1;transform:none}}
+@keyframes qmLogoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes qmOrb{0%,100%{transform:translate(0,0)}50%{transform:translate(8px,-14px)}}
+@keyframes qmSpin{to{transform:rotate(360deg)}}
+@keyframes qmTabIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes qmKioskIn{from{opacity:0;transform:scale(1.025)}to{opacity:1;transform:none}}
+@keyframes qmScreenIn{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes qmSideIn{from{opacity:0;transform:translateX(-34px)}to{opacity:1;transform:none}}
+@keyframes qmMainIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes qmCheckoutIdle{0%,100%{transform:scale(1) rotate(0deg)}35%{transform:scale(1.045) rotate(-2deg)}65%{transform:scale(1.02) rotate(2deg)}}
+@keyframes qmHalo{0%,100%{transform:scale(.94);opacity:.55}50%{transform:scale(1.06);opacity:1}}
+@keyframes qmTileGlow{0%,100%{opacity:.55;transform:rotate(-2deg)}50%{opacity:1;transform:rotate(2deg)}}
+@keyframes blkShrink{from{width:100%}to{width:0}}
+@keyframes qmToastIn{from{opacity:0;transform:translateX(-50%) translateY(20px) scale(.96)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+
+.tab.active{animation:qmTabIn .45s cubic-bezier(.2,.8,.2,1)}
+#kiosk.on{animation:qmKioskIn .5s cubic-bezier(.2,.8,.2,1)}
+.screen.on{animation:qmScreenIn .5s cubic-bezier(.2,.8,.2,1)}
+body.app-in .sidebar{animation:qmSideIn .6s cubic-bezier(.2,.8,.2,1) backwards}
+body.app-in main{animation:qmMainIn .7s .1s cubic-bezier(.2,.8,.2,1) backwards}
+
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}tbody tr{opacity:1!important}}
