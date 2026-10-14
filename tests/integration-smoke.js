@@ -1,20 +1,47 @@
-const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const pages=['login.html','dashboard.html','history.html','inventory.html','scan.html','kiosk.html'];
+const rootHtml=fs.readdirSync(root).filter(p=>p.endsWith('.html'));
+assert.deepEqual(rootHtml,['index.html'],'Only index.html should exist at repository root');
+const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
+assert(index.includes("location.replace('manager/login.html'+location.search+location.hash)"));
 for(const p of pages){
- const html=fs.readFileSync(path.join(root,p),'utf8');
- for(const m of html.matchAll(/<script src="((?:js|assets\/js)\/[^\"]+)"/g))
-  assert(fs.existsSync(path.join(root,m[1])),p+' missing '+m[1]);
- if(p==='inventory.html')for(const id of ['epc-product','epc-arm','epc-clear','epc-captured'])assert(html.includes('id="'+id+'"'));
- if(['login.html','scan.html','kiosk.html'].includes(p))assert(html.includes('id="m-reset-confirm"'));
+ const name='manager/'+p;
+ const html=fs.readFileSync(path.join(root,name),'utf8');
+ for(const match of html.matchAll(/(?:src|href)=["']([^"']+)["']/g)){
+  const ref=match[1];
+  if(/^(https?:|data:|mailto:|#)/i.test(ref)||ref.startsWith('//'))continue;
+  const clean=ref.split(/[?#]/)[0];
+  if(!clean)continue;
+  const target=path.resolve(root,'manager',clean);
+  assert(fs.existsSync(target),name+' has broken asset/navigation path: '+ref);
+ }
+ for(const m of html.matchAll(/<script src="([^"]+)"/g)){
+  if(!/^https?:/i.test(m[1]))assert(fs.existsSync(path.resolve(root,'manager',m[1])),name+' missing '+m[1]);
+ }
+ assert(html.includes('../js/backend.js'),name+' must load the real PHP API adapter');
+ if(p==='inventory.html')for(const id of ['epc-product','epc-arm','epc-clear','epc-captured'])
+  assert(html.includes('id="'+id+'"'),name+' missing '+id);
+ if(['login.html','scan.html','kiosk.html'].includes(p))
+  assert(html.includes('id="m-reset-confirm"'),name+' missing reset confirmation');
 }
+const legacy=fs.readFileSync(path.join(root,'manager/reset-password.html'),'utf8');
+assert(legacy.includes("const target='login.html'+"));
+const mail=fs.readFileSync(path.join(root,'api/auth/forgot-password.php'),'utf8');
+assert(mail.includes("'/manager/login.html?reset_token='"));
 const adapter=fs.readFileSync(path.join(root,'js/backend.js'),'utf8');
 for(const ep of ['api/auth/login.php','api/auth/signup.php','api/auth/forgot-password.php',
  'api/auth/reset-password.php','api/rfid/detect.php','api/rfid/register.php',
  'api/checkout/process.php','api/transactions/list.php','api/rfid/list.php'])
  assert(adapter.includes(ep),'API endpoint missing '+ep);
 assert(!adapter.includes('DEMO_MODE'));
-// Hardware snapshot and removal test on emulated keyboard HID event stream.
+assert(adapter.includes("fetch('../'+path"),'PHP API fetch must go up from manager/');
+const url=new URL('../api/auth/me.php','http://localhost/QuickMart-Final/manager/dashboard.html');
+assert.equal(url.href,'http://localhost/QuickMart-Final/api/auth/me.php');
+// Existing no-hardware RFID presence and removal test.
 const scanner=fs.readFileSync(path.join(root,'assets/js/rfid-scanner.js'),'utf8');
 let now=0,keyListener=null,intervalFn=null,timeoutFn=null;
 const events=[],win={dispatchEvent:e=>events.push(e)};
@@ -35,4 +62,4 @@ for(let i=0;i<4;i++){now+=1300;scan(a);scan(b);intervalFn()}
 assert.deepEqual([...reader.getPresentEpcs()],[a,b]);
 now+=11000;intervalFn();assert.deepEqual([...reader.getPresentEpcs()],[]);
 reader.disable();assert(!reader.isEnabled());
-console.log('Page references, PHP API integration references, and RFID presence tests passed');
+console.log('Manager page paths, password-reset routing, PHP API and RFID smoke tests passed');

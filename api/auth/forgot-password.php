@@ -57,7 +57,7 @@ try {
 
     $conn->commit();
 
-    $url = rtrim(APP_BASE_URL, '/') . '/index.html?reset_token=' . urlencode($rawToken);
+    $url = rtrim(APP_BASE_URL, '/') . '/manager/login.html?reset_token=' . urlencode($rawToken);
     if (!send_password_reset_email((string) $admin['email'], $url, (string) $admin['admin_name'])) {
         error_log('QuickMart password reset email delivery failed.');
     }

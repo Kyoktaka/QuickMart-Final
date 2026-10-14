@@ -44,8 +44,9 @@ longer reference `size`.
 ## Final frontend integration (October 14, 2026)
 
 The team-provided `quickmart` multi-page design is now the active frontend at
-repository root. `index.html` forwards to `login.html`; the `js/backend.js`
-adapter uses the existing PHP/MySQL APIs. All 18 original frontend CSS files
+`manager/` folder. The root `index.html` forwards to `manager/login.html`;
+the `js/backend.js`
+adapter uses `../api/` from the manager pages to reach the existing PHP/MySQL APIs. All 18 original frontend CSS files
 and the login background asset were preserved byte-for-byte.
 
 Manager login, product updates, RFID EPC registration and live detection,
@@ -63,6 +64,23 @@ Run `node tests/integration-smoke.js` and `php -l api/rfid/list.php` for
 syntax/contract smoke tests. Live MySQL, camera, SMTP and physical RFID reader
 must still be checked locally. QR payments are classroom-only, localhost-only
 fixtures and are not a real payment gateway.
+
+## Manager page organization (October 14, 2026)
+
+The only root-level HTML page is `index.html`. All active manager pages are
+in `manager/`: `login.html`, `dashboard.html`, `history.html`,
+`inventory.html`, `scan.html`, and `kiosk.html`.
+
+The root index redirects to `manager/login.html` while preserving query
+parameters, including legacy password-reset links. New reset emails point
+directly to the manager login page. HTML loads root-level CSS, JS and assets
+via `../css/`, `../js/`, and `../assets/`; API calls use `../api/`.
+The existing PHP endpoints, session rules, CSS files, and database schema
+remain unchanged. Existing `manager/reset-password.html` bookmarks also
+forward to `manager/login.html`.
+
+Run `node tests/integration-smoke.js` to check page assets, links, reset
+routing, API relative paths, and RFID behavior.
 
 ## RFID integration
 
