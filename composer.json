@@ -4,6 +4,6 @@
     "type": "project",
     "require": {
         "php": "^8.1",
-        "phpmailer/phpmailer": "^6.9"
+        "phpmailer/phpmailer": "^7.1"
     }
 }
