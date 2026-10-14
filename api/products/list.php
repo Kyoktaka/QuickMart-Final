@@ -17,7 +17,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 try {
     // Physical available inventory is the number of AVAILABLE EPCs per active product.
     $stmt = $conn->query("
-        SELECT p.product_id, p.product_name, p.description, p.unit_price, p.category, p.size, p.status,
+        SELECT p.product_id, p.product_name, p.description, p.unit_price, p.category, p.status,
                COALESCE(stock.stock_available, 0) AS stock_available
         FROM PRODUCTtbl AS p
         LEFT JOIN (

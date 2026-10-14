@@ -11,7 +11,6 @@ CREATE TABLE PRODUCTtbl (
     description TEXT NULL,
     unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     category VARCHAR(100) NOT NULL DEFAULT 'General',
-    size VARCHAR(50) NULL,
     status TINYINT(1) NOT NULL DEFAULT 1,
 
     PRIMARY KEY (product_id),
@@ -20,17 +19,17 @@ CREATE TABLE PRODUCTtbl (
     INDEX idx_product_status (status)
 );
 
-INSERT INTO PRODUCTtbl (product_name, unit_price, category, size) VALUES
-('Zonrox Color Safe Bleach', 30.00, 'Home Essentials', '225ml'),
-('Nissin Cup Noodles', 25.00, 'Food & Snacks', '40g'),
-('Rice Scooper', 32.00, 'Home Essentials', '18g'),
-('Oishi Potato Fries', 16.00, 'Food & Snacks', '50g'),
-('Sleek Stockings', 60.00, 'Clothing', '1'),
-('Colgate Toothbrush', 20.00, 'Home Essentials', 'medium'),
-('Dumpling Squishy', 67.00, 'Toys', '160g'),
-('Lablast Detergent Bar', 12.00, 'Home Essentials', '130g'),
-('Pocky Snack Box', 35.00, 'Food & Snacks', '40g'),
-('Argentina Giniling', 69.00, 'Food & Snacks', '250g');
+INSERT INTO PRODUCTtbl (product_name, description, unit_price, category) VALUES
+('Zonrox Color Safe Bleach', 'Blossom Fresh Scent (225 ml)', 30.00, 'Home Essentials'),
+('Nissin Cup Noodles', 'Seafood Flavor (40g)', 25.00, 'Food & Snacks'),
+('Rice Scooper', 'Recyclable Plastic Material (18g)', 32.00, 'Home Essentials'),
+('Oishi Potato Fries', 'Plain Flavor (50g)', 16.00, 'Food & Snacks'),
+('Sleek Stockings', 'Soft and Breathable (1 pair)', 60.00, 'Clothing'),
+('Colgate Toothbrush', 'Recyclable Plastic Material', 20.00, 'Home Essentials'),
+('Dumpling Squishy', 'Fun and Relaxing (160g)', 67.00, 'Toys'),
+('Lablast Detergent Bar', 'Floral Scent (130g)', 12.00, 'Home Essentials'),
+('Pocky Snack Box', 'Chocolate Flavor (40g)', 35.00, 'Food & Snacks'),
+('Argentina Giniling', 'Ground Pork Mix (250g)', 69.00, 'Food & Snacks');
 
 
 CREATE TABLE RFID_tags (

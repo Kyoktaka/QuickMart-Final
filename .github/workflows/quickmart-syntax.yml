@@ -14,6 +14,8 @@ jobs:
           if [ -d js ]; then find js -type f -name '*.js' -print0 | xargs -0 -n1 node --check; fi
       - name: Validate two fixed demo QR outcomes
         run: php tests/demo-qr.php
+      - name: Product description/schema contract
+        run: php tests/product-description-contract.php
       - name: RFID presence and scan regression tests
         run: node tests/rfid-scanner.js
       - name: Multi-tag restocking and product isolation tests

@@ -19,7 +19,6 @@ $productName = trim((string)($data['product_name'] ?? ''));
 $description = is_string($data['description'] ?? null) ? trim($data['description']) : '';
 $unitPrice = $data['unit_price'] ?? $data['price'] ?? null;
 $category = trim((string)($data['category'] ?? 'General'));
-$size = trim((string)($data['size'] ?? ''));
 
 if ($productId === false || $productId === null) {
     json_response([
@@ -57,8 +56,7 @@ if (strlen($description) > 5000) {
 
 if (
     strlen($productName) > 150 ||
-    strlen($category) > 100 ||
-    strlen($size) > 50
+    strlen($category) > 100
 ) {
     json_response([
         'success' => false,
@@ -89,8 +87,7 @@ try {
         SET product_name = :product_name,
             description = :description,
             unit_price = :unit_price,
-            category = :category,
-            size = :size
+            category = :category
         WHERE product_id = :product_id
     ");
 
@@ -99,7 +96,6 @@ try {
         ':description' => $description,
         ':unit_price' => $unitPrice,
         ':category' => $category,
-        ':size' => $size === '' ? null : $size,
         ':product_id' => $productId
     ]);
 

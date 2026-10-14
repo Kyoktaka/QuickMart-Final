@@ -13,7 +13,6 @@ $productName = trim((string)($data['product_name'] ?? ''));
 $description = is_string($data['description'] ?? null) ? trim($data['description']) : '';
 $category = trim((string)($data['category'] ?? 'General'));
 $price = $data['unit_price'] ?? $data['price'] ?? null;
-$size = trim((string)($data['size'] ?? ''));
 
 if ($productName === '') {
     json_response([
@@ -44,13 +43,6 @@ if (strlen($productName) > 150) {
     ], 400);
 }
 
-if (strlen($size) > 50) {
-    json_response([
-        'success' => false,
-        'message' => 'Product size cannot exceed 50 characters.'
-    ], 400);
-}
-
 if (strlen($category) > 100) {
     json_response([
         'success' => false,
@@ -60,15 +52,14 @@ if (strlen($category) > 100) {
 
 try {
     $stmt = $conn->prepare("
-        INSERT INTO PRODUCTtbl (product_name, description, unit_price, size, category)
-        VALUES (:product_name, :description, :unit_price, :size, :category)
+        INSERT INTO PRODUCTtbl (product_name, description, unit_price, category)
+        VALUES (:product_name, :description, :unit_price, :category)
     ");
 
     $stmt->execute([
         ':product_name' => $productName,
         ':description' => $description,
         ':unit_price' => $price,
-        ':size' => $size === '' ? null : $size,
         ':category' => $category
     ]);
 
@@ -86,7 +77,6 @@ try {
             'description' => $description,
             'unit_price' => (float)$price,
             'category' => $category,
-            'size' => $size,
             'status' => 1
         ]
     ], 201);
