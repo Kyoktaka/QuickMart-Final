@@ -19,6 +19,33 @@ the existing PHP/MySQL backend. No browser-stored passwords or simulated wallets
    environment to send reset-password emails. Restart Apache after changes.
    The emailed secure token link changes passwords; the browser does not.
 
+## Product description consolidation (approved by database team)
+
+`PRODUCTtbl` no longer has a separate `size` column. Product weight, volume,
+material, scent, flavor, and similar details are stored in the existing
+`description` field (e.g. `Blossom Fresh Scent (225 ml)`). The 10 sample
+products in `database/schema.sql` now include their approved descriptions.
+Product create, edit, list, RFID detection, and the frontend API adapter no
+longer reference `size`.
+
+- **New/fresh database:** import `database/schema.sql`; no migrations required.
+- **Existing XAMPP database:** export a full SQL backup, stop checkout testing,
+  and run `database/migrations/20261014_product_description_remove_size.sql`
+  **once** in phpMyAdmin for `rfid_checkout_main`. It sets approved descriptions
+  for the 10 example products, preserves any size on custom products by appending
+  it to the description if not already present, then removes `size`.
+  It does not drop products, accounts, purchase history, or RFID mappings.
+  Review any customized descriptions and take a backup before running.
+- Run the database migration **before** using the updated PHP endpoints.
+  Changing `schema.sql` in GitHub does not automatically alter an existing DB.
+- Sync your ERD with the implementation: remove `PRODUCTtbl.size` and show
+  `PRODUCTtbl.description`. Available stock is computed from RFID tags.
+
+The final new multi-page frontend package is a **separate overlay** and has not
+been pushed into this repository by this backend-only change; its
+`js/backend.js` also needs the no-`size` adapter included in the updated
+integration ZIP. Applying the ZIP must never replace the PHP endpoints or schema.
+
 ## RFID integration
 
 The assets/js/rfid-scanner.js handler captures EPCs from the USB HID

@@ -33,14 +33,14 @@ const Backend={
     return (r.products||[]).map(p=>({
       id:Number(p.product_id),code:p.formatted_product_id,
       name:p.product_name,description:p.description||'',category:p.category||'General',
-      stock:Number(p.stock_available||0),price:Number(p.unit_price||0),size:p.size||'',
+      stock:Number(p.stock_available||0),price:Number(p.unit_price||0),
       active:Number(p.status)===1
     }));
   },
   async saveProduct(p){
     const path=p.id?'api/products/update.php':'api/products/create.php';
     const r=await post(path,{product_id:p.id||undefined,product_name:p.name,
-      description:p.description||'',category:p.category,unit_price:p.price,size:p.size||''});
+      description:p.description||'',category:p.category,unit_price:p.price});
     return r.product||r;
   },
   async deleteProduct(id){return post('api/products/delete.php',{product_id:id})},

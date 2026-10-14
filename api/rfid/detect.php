@@ -38,7 +38,7 @@ if ($epcs) {
     try {
         $stmt = auth_database()->prepare(
             'SELECT r.tag_id, r.epc, r.product_id, r.status AS tag_status, '
-            . 'p.product_name, p.unit_price, p.category, p.size, p.status AS product_status '
+            . 'p.product_name, p.unit_price, p.category, p.status AS product_status '
             . 'FROM RFID_tags AS r '
             . 'INNER JOIN PRODUCTtbl AS p ON p.product_id = r.product_id '
             . 'WHERE r.epc IN (' . $placeholders . ')'
@@ -75,7 +75,6 @@ if ($epcs) {
                 'product_name' => $row['product_name'],
                 'unit_price' => (float) $row['unit_price'],
                 'category' => $row['category'],
-                'size' => $row['size'],
                 'quantity' => 0,
                 'subtotal' => 0.0,
                 'epcs' => [],
