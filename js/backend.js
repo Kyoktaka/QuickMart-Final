@@ -2,7 +2,7 @@
 async function apiRequest(path,options={}){
   const headers={'Accept':'application/json',...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})};
   let response;
-  try{response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,headers})}
+  try{response=await fetch('../'+path,{credentials:'same-origin',cache:'no-store',...options,headers})}
   catch(e){throw new Error('Cannot reach QuickMart PHP server. Start Apache and MySQL in XAMPP.')}
   const raw=await response.text();let data;
   try{data=raw?JSON.parse(raw):{}}catch(e){throw new Error('Unexpected response from PHP ('+response.status+').')}
