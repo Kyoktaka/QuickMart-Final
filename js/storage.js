@@ -1,2 +1,2 @@
-/* Persistence is provided by the PHP/MySQL backend.
-   Do not cache manager passwords, product stock, wallets, or checkout status in localStorage. */
+/* No products, passwords, purchase records or wallet balances in browser storage. */
+const SS_AUTH='qm_auth',SS_KIOSK='qm_kiosk',SS_FRESH='qm_fresh';

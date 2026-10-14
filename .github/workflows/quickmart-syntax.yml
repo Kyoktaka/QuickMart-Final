@@ -11,7 +11,7 @@ jobs:
         run: find api config includes manager -type f -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Frontend JavaScript syntax
         run: |
-          if [ -d js ]; then find js -type f -name '*.js' -print0 | xargs -0 -n1 node --check; fi
+          find js assets/js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Validate two fixed demo QR outcomes
         run: php tests/demo-qr.php
       - name: Product description/schema contract
@@ -20,3 +20,5 @@ jobs:
         run: node tests/rfid-scanner.js
       - name: Multi-tag restocking and product isolation tests
         run: node tests/inventory-batch.js
+      - name: Final frontend integration smoke tests
+        run: node tests/integration-smoke.js

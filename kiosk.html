@@ -114,7 +114,7 @@
   <div class="astep" id="as4"><h3>Reset Password</h3><p class="sub">Enter your registered Gmail address to receive reset instructions.</p>
     <div class="fg" style="margin-top:14px;text-align:left"><label>Gmail address</label><input type="email" id="rs-gmail" placeholder="e.g. manager@gmail.com" autocomplete="off" style="text-align:left"></div>
     <div class="err" id="e4"></div>
-    <button class="btn" id="btn-gmail-received" style="width:100%">Gmail received</button></div>
+    <button class="btn" id="btn-gmail-received" style="width:100%">Send reset link</button></div>
   <div class="astep" id="as5"><h3>Set New Password</h3><p class="sub">Please enter your new password below.</p>
     <div class="fg" style="margin-top:14px;text-align:left"><label>New password</label><input type="password" id="rs-new" placeholder="Create a new password" autocomplete="off" style="text-align:left"></div>
     <div class="fg" style="text-align:left"><label>Confirm new password</label><input type="password" id="rs-conf" placeholder="Confirm your new password" autocomplete="off" style="text-align:left"></div>
@@ -123,6 +123,12 @@
   <button class="btn ghost" id="btn-auth-cancel" style="width:100%;margin-top:12px">Cancel</button>
 </div></div>
 
+<!-- Reset request confirmation uses the supplied QuickMart modal styling. -->
+<div class="modal" id="m-reset-confirm" role="dialog" aria-modal="true" aria-labelledby="reset-confirm-title" aria-describedby="reset-confirm-desc"><div class="mbox" style="text-align:center">
+  <h2 id="reset-confirm-title">Reset Link Requested</h2>
+  <p class="d" id="reset-confirm-desc">If your email address is registered, you'll receive a password reset link shortly. Please check your inbox and spam folder.</p>
+  <button class="btn" id="btn-reset-confirm-ok" type="button" style="width:100%">Got It</button>
+</div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="js/storage.js"></script>
@@ -132,6 +138,7 @@
 <script src="js/auth.js"></script>
 <script src="js/qr-payment.js"></script>
 <script src="js/camera-scanner.js"></script>
+<script src="assets/js/rfid-scanner.js"></script>
 <script src="js/kiosk.js"></script>
 <script src="js/main.js"></script>
 </body>
