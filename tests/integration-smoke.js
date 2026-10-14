@@ -11,9 +11,9 @@ assert(index.includes("location.replace('manager/login.html'+location.search+loc
 for(const p of pages){
  const name='manager/'+p;
  const html=fs.readFileSync(path.join(root,name),'utf8');
- for(const match of html.matchAll(/\\b(?:src|href)=["']([^"']+)["']/g)){
+ for(const match of html.matchAll(/(?:src|href)=["']([^"']+)["']/g)){
   const ref=match[1];
-  if(/^(https?:|data:|mailto:|#|\\/\\/)/i.test(ref))continue;
+  if(/^(https?:|data:|mailto:|#)/i.test(ref)||ref.startsWith('//'))continue;
   const clean=ref.split(/[?#]/)[0];
   if(!clean)continue;
   const target=path.resolve(root,'manager',clean);
