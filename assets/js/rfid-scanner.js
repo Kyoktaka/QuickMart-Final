@@ -1,34 +1,92 @@
-/* HID UHF keyboard reader, based on current QuickMart grace-period logic. */
-(()=>{
-  const present=new Map();let enabled=false,buffer='',timer,lastKey=0;
+/* QuickMart USB-HID keyboard-emulation UHF reader.
+   Hardware must continuously report tags to estimate removal.
+   This is presence inference, NOT a hardware-defined 14x16-inch read boundary. */
+(() => {
+  const KEY_GAP_MS=85,MAX_EPC_LENGTH=100,MIN_EPC_LENGTH=6;
+  // Multi-tag reads may arrive in uneven rounds, so don't expire after 1.5s.
+  // Every repeat refreshes lastSeen; absence is inferred from missing events.
+  // These are software tolerances, NOT physical removal signals.
+  const FIRST_MISS_MS=6000,MIN_MISS_MS=4500,MAX_MISS_MS=9000;
+  const present=new Map();
+  let enabled=false,buffer='',timer=null,lastKeyAt=0;
+
+  const normalize=value=>String(value??'').trim().replace(/\s+/g,'').toUpperCase();
+  const valid=epc=>epc.length>=MIN_EPC_LENGTH&&epc.length<=MAX_EPC_LENGTH
+    &&/^[A-Z0-9:_-]+$/.test(epc);
   const list=()=>[...present.keys()];
-  const valid=s=>s.length>=6&&s.length<=100&&/^[A-Z0-9:_-]+$/.test(s);
-  const emit=()=>window.dispatchEvent(new CustomEvent('rfid:tray',{detail:list()}));
-  const clear=()=>{if(present.size){present.clear();emit()}};
-  const flush=()=>{clearTimeout(timer);timer=null;const value=buffer.trim().toUpperCase();buffer='';if(!enabled||!valid(value))return;
-    const now=performance.now(),prior=present.get(value);
-    if(prior){const gap=now-prior.lastSeen;if(gap>=100&&gap<=30000)prior.interval=prior.interval===null?gap:prior.interval*.6+gap*.4;
-      prior.lastSeen=now;prior.reads++}
-    else{present.set(value,{lastSeen:now,interval:null,reads:1});emit();window.dispatchEvent(new CustomEvent('rfid:epc',{detail:value}))}
-    window.dispatchEvent(new CustomEvent('rfid:read',{detail:{epc:value,at:now}}));
-  };
-  const setEnabled=value=>{if(!!value===enabled)return;enabled=!!value;clearTimeout(timer);buffer='';lastKey=0;if(!enabled)clear()};
-  document.addEventListener('keydown',e=>{
-    if(!enabled||e.ctrlKey||e.metaKey||e.altKey)return;
-    const active=document.activeElement;if(active&&(['INPUT','TEXTAREA','SELECT'].includes(active.tagName)||active.isContentEditable))return;
-    const now=performance.now(),burst=now-lastKey<=85;lastKey=now;
-    if(e.key==='Enter'){if(buffer){e.preventDefault();e.stopPropagation();flush()}return}
-    if(e.key.length!==1||!/^[A-Za-z0-9:_-]$/.test(e.key))return;
-    if(buffer&&!burst)flush();buffer+=e.key;if(buffer.length>100){buffer='';return}
-    e.preventDefault();clearTimeout(timer);timer=setTimeout(flush,115);
+  function emitTray(){window.dispatchEvent(new CustomEvent('rfid:tray',{detail:list()}))}
+  function clearPresence(){
+    if(!present.size)return;
+    present.clear();emitTray();
+  }
+  function register(raw){
+    const epc=normalize(raw);
+    if(!valid(epc)||!enabled)return false;
+    const now=performance.now(),old=present.get(epc);
+    if(old){
+      const gap=now-old.lastSeen;
+      if(gap>=100&&gap<=30000)old.interval=old.interval===null?gap:(old.interval*.6+gap*.4);
+      old.lastSeen=now;old.reads++;
+    }else{
+      present.set(epc,{lastSeen:now,interval:null,reads:1});
+      emitTray();
+      // Single newly detected EPC event for *deliberate* one-tag restocking.
+      window.dispatchEvent(new CustomEvent('rfid:epc',{detail:epc}));
+    }
+    window.dispatchEvent(new CustomEvent('rfid:read',{detail:{epc,at:now}}));
+    return true;
+  }
+  function flush(){
+    clearTimeout(timer);timer=null;
+    const value=buffer;buffer='';
+    if(value)register(value);
+  }
+  function setEnabled(value){
+    const next=Boolean(value);
+    if(next===enabled)return;
+    enabled=next;
+    clearTimeout(timer);timer=null;buffer='';lastKeyAt=0;
+    if(!enabled)clearPresence();
+  }
+  function expire(){
+    if(!enabled)return;
+    const now=performance.now();let changed=false;
+    for(const [epc,meta] of present){
+      const allowance=meta.interval===null?FIRST_MISS_MS:
+        Math.max(MIN_MISS_MS,Math.min(MAX_MISS_MS,meta.interval*5));
+      if(now-meta.lastSeen>allowance){present.delete(epc);changed=true}
+    }
+    if(changed)emitTray();
+  }
+  document.addEventListener('keydown',event=>{
+    if(!enabled||event.ctrlKey||event.altKey||event.metaKey)return;
+    // Never mistake a manager typing in a field for an RFID read.
+    const active=document.activeElement;
+    if(active&&(['INPUT','TEXTAREA','SELECT'].includes(active.tagName)||active.isContentEditable))return;
+    const now=performance.now(),burst=now-lastKeyAt<=KEY_GAP_MS;
+    lastKeyAt=now;
+    if(event.key==='Enter'){
+      if(buffer){event.preventDefault();event.stopPropagation();flush()}
+      return;
+    }
+    if(event.key.length!==1||!/^[A-Za-z0-9:_-]$/.test(event.key))return;
+    if(buffer&&!burst)flush();
+    buffer+=event.key;
+    if(buffer.length>MAX_EPC_LENGTH){buffer='';return}
+    event.preventDefault();
+    clearTimeout(timer);
+    timer=setTimeout(flush,KEY_GAP_MS+30);
   },true);
-  setInterval(()=>{if(!enabled)return;const now=performance.now();let changed=false;
-    for(const [epc,d] of present){const ttl=d.interval===null?6000:Math.max(4500,Math.min(9000,d.interval*5));
-      if(now-d.lastSeen>ttl){present.delete(epc);changed=true}}
-    if(changed)emit();
-  },250);
-  window.RFIDScanner={enable:()=>setEnabled(true),disable:()=>setEnabled(false),setEnabled,
-    isEnabled:()=>enabled,getPresentEpcs:list,
-    getDiagnostics:()=>[...present].map(([epc,d])=>({epc,reads:d.reads,estimatedReadIntervalMs:d.interval,
-      ageSinceLastReadMs:Math.round(performance.now()-d.lastSeen)}))};
+  setInterval(expire,250);
+  window.RFIDScanner={
+    enable:()=>setEnabled(true),disable:()=>setEnabled(false),setEnabled,
+    isEnabled:()=>enabled,
+    getPresentEpcs:list,
+    getDiagnostics:()=>[...present].map(([epc,d])=>({
+      epc,reads:d.reads,estimatedReadIntervalMs:d.interval,
+      ageSinceLastReadMs:Math.round(performance.now()-d.lastSeen),
+      expiryToleranceMs:Math.round(d.interval===null?FIRST_MISS_MS:
+        Math.max(MIN_MISS_MS,Math.min(MAX_MISS_MS,d.interval*5)))
+    }))
+  };
 })();
