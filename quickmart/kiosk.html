@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickMart – Self-Checkout Kiosk</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/animations.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/modals.css">
+<link rel="stylesheet" href="css/kiosk.css">
+<link rel="stylesheet" href="css/toast.css">
+<link rel="stylesheet" href="css/camera.css">
+<link rel="stylesheet" href="css/responsive.css">
+<link rel="stylesheet" href="css/kiosk-welcome.css">
+<script src="js/guard.js" data-require-kiosk></script>
+</head>
+<body>
+
+<!-- KIOSK -->
+<div id="kiosk" class="on idle">
+  <div class="khead"><div class="klogo"><svg viewBox="0 0 140 140" width="52" height="52" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 22h22l18 74h66"/><circle cx="58" cy="124" r="13"/><rect x="52" y="8" width="78" height="64" rx="12"/><path d="M72 26v28M82 24v30M92 24v30M102 26v28M112 28v24" stroke-width="7"/></svg><span>QuickMart</span></div><div class="kright"><span class="kstation">Self-Checkout Station 01</span><button class="btn ghost" id="btn-kiosk-exit">Manager exit</button></div></div>
+
+  <div class="screen on" id="k-idle"><svg class="bubbles" viewBox="0 0 1389 744" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="bg1" x1=".25" y1="0" x2=".75" y2="1"><stop offset="0" stop-color="#FF9655"/><stop offset="1" stop-color="#FFD95C"/></linearGradient>
+        <linearGradient id="bg2" x1=".25" y1="0" x2=".75" y2="1"><stop offset="0" stop-color="#FFD95C"/><stop offset="1" stop-color="#FF9655"/></linearGradient>
+      </defs>
+      <circle cx="-45" cy="123" r="122" fill="url(#bg2)"/><circle cx="342" cy="139" r="60" fill="url(#bg1)"/>
+      <circle cx="1136" cy="72" r="38" fill="url(#bg1)"/><circle cx="1338" cy="206" r="65" fill="url(#bg1)"/>
+      <circle cx="208" cy="365" r="43" fill="url(#bg2)"/><circle cx="1137" cy="366" r="60" fill="url(#bg2)"/>
+    </svg><div class="idle-icon"><svg viewBox="0 0 140 140" width="190" height="190" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 22h22l18 74h66"/><circle cx="58" cy="124" r="13"/><rect x="52" y="8" width="78" height="64" rx="12"/><path d="M72 26v28M82 24v30M92 24v30M102 26v28M112 28v24" stroke-width="7"/></svg></div><h1>Welcome!</h1><p class="lead">Scan or place your products to begin checkout.</p><button class="tag-pill" id="btn-idle-tag" type="button">Input Tag</button></div>
+
+  <div class="screen" id="k-cart">
+    <div class="cart-top">
+      <h1><svg viewBox="0 0 140 140" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 22h22l18 74h66"/><circle cx="58" cy="124" r="13"/><rect x="52" y="8" width="78" height="64" rx="12"/><path d="M72 26v28M82 24v30M92 24v30M102 26v28M112 28v24" stroke-width="7"/></svg>Shopping Cart</h1>
+      <div class="cart-date" data-clock></div>
+    </div>
+    <div class="cart-main">
+      <div class="cart-table-card">
+        <table>
+          <colgroup><col style="width:7%"><col style="width:27%"><col style="width:29%"><col style="width:13%"><col style="width:9%"><col style="width:15%"></colgroup>
+          <thead><tr><th>#</th><th>Product</th><th>Product ID</th><th>Price</th><th>Qty</th><th>Total</th></tr></thead>
+          <tbody id="cart-body"></tbody>
+        </table>
+      </div>
+      <div class="cart-total"><span class="lbl">TOTAL · <span id="sum-items">0</span> items</span><span class="amt2" id="sum-total">₱0.00</span><span id="sum-tax" hidden>₱0.00</span></div>
+      <div class="cart-actions">
+        <button class="cbtn confirm" id="btn-checkout" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5l5.5 5.5L20.5 6.5"/></svg>Confirm Checkout</button>
+        <button class="cbtn outline" id="btn-input-tag-toggle" type="button">INPUT TAG</button>
+        <button class="cbtn outline" id="btn-cancel" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>Cancel Order</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="k-qr">
+    <h1 style="font-size:34px">Ready to pay</h1>
+    <p class="lead" style="margin-bottom:8px">Scan your QuickMart payment QR code.</p>
+    <div class="qr-box" id="qr-box"><div id="qr-reader"></div><div class="scan-frame-corners"></div><div class="scan-line"></div></div>
+    <p class="qr-status" id="qr-status" role="status" aria-live="polite">Starting camera…</p>
+    <p class="timer">Payment closes in <span id="qr-timer">05:00</span></p>
+    <p class="sub">Total amount</p><p class="amt" id="qr-total">₱0.00</p>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn ghost" id="btn-qr-back">Back to cart</button>
+      <button class="btn" id="btn-cam-retry" style="display:none">Try camera again</button>
+      <button class="btn danger" id="btn-cancel-scan" style="display:none">Cancel Payment</button>
+    </div>
+  </div>
+
+  <div class="screen" id="k-success"><div class="ricon" data-icon="✔" style="color:var(--ok)" aria-hidden="true"></div><h1 style="color:var(--ok)">Payment Successful!</h1>
+    <p class="lead" style="margin-bottom:10px">Thank you for shopping with us!</p>
+    <div class="sid" id="ok-sid">SESS-0000-0000</div>
+    <div class="receipt" id="ok-receipt"></div>
+    <button class="btn dark" id="btn-new" style="padding:14px 44px;font-size:17px">Start new session</button></div>
+
+  <div class="screen" id="k-fail"><div class="ricon" data-icon="!" style="color:var(--bad)" aria-hidden="true"></div><h1 style="color:var(--bad)">Payment Didn't Go Through</h1>
+    <p class="lead" id="fail-reason">Please try again or request assistance.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;width:300px">
+      <button class="btn" id="btn-retry" style="padding:15px">Try again</button>
+      <button class="btn danger" id="btn-cancel2" style="padding:15px">Cancel transaction</button></div></div>
+  <svg class="wave-footer" viewBox="0 0 1440 160" preserveAspectRatio="none" aria-hidden="true"><path fill="#FF8A3D" d="M0 8C260 22 520 80 800 108S1300 118 1440 50L1440 160L0 160Z"/><path fill="#005E38" d="M0 26C260 40 520 98 800 126S1300 136 1440 72L1440 160L0 160Z"/></svg>
+</div>
+
+<!-- KIOSK: INPUT TAG POPUP -->
+<div class="modal" id="m-tag" role="dialog" aria-modal="true" aria-labelledby="tag-title"><div class="mbox">
+  <h2 id="tag-title">Input the attached tag on product.</h2>
+  <input id="tag-modal-input" type="text" autocomplete="off" aria-label="Product tag (EPC code)">
+  <button class="tag-confirm" id="tag-modal-confirm" type="button">Confirm</button>
+</div></div>
+
+<!-- KIOSK: PRODUCT BLOCKED POPUP -->
+<div class="modal" id="m-blocked" role="alertdialog" aria-modal="true" aria-labelledby="blk-title"><div class="mbox">
+  <div class="blk-bar"></div>
+  <div class="blk-icon"><span>!</span></div>
+  <h2 id="blk-title">Product blocked</h2>
+  <p><span id="blk-name">This product</span> is already purchased!</p>
+</div></div>
+
+<!-- AUTH MODAL -->
+<div class="modal" id="m-auth" role="dialog" aria-modal="true"><div class="mbox">
+  <h2 id="auth-title"></h2>
+  <div class="astep on" id="as1"><h3>Layer 1 of 3 · RFID scan</h3><p class="sub">Tap your manager card on the reader.</p>
+    <div class="pad">Waiting for card…</div><div class="err" id="e1"></div></div>
+  <div class="astep" id="as2"><h3>Password verification</h3><p class="sub">Enter your manager password.</p>
+    <div class="fg" style="margin-top:14px"><input type="password" id="auth-pw" placeholder="Enter manager password" autocomplete="off"></div><div class="err" id="e2"></div>
+    <button class="btn" id="btn-pw" style="width:100%">Verify password</button></div>
+  <div class="astep" id="as3"><h3>Layer 3 of 3 · Master key</h3><p class="sub">Enter the master key to authorize.</p>
+    <div class="fg" style="margin-top:14px"><input type="password" id="auth-mk" placeholder="Enter master key" autocomplete="off"></div><div class="err" id="e3"></div>
+    <button class="btn" id="btn-mk" style="width:100%">Authorize</button>
+    <button class="link" id="btn-forgot">Reset or change password</button></div>
+  <div class="astep" id="as4"><h3>Reset Password</h3><p class="sub">Enter your registered Gmail address to receive reset instructions.</p>
+    <div class="fg" style="margin-top:14px;text-align:left"><label>Gmail address</label><input type="email" id="rs-gmail" placeholder="e.g. manager@gmail.com" autocomplete="off" style="text-align:left"></div>
+    <div class="err" id="e4"></div>
+    <button class="btn" id="btn-gmail-received" style="width:100%">Gmail received</button></div>
+  <div class="astep" id="as5"><h3>Set New Password</h3><p class="sub">Please enter your new password below.</p>
+    <div class="fg" style="margin-top:14px;text-align:left"><label>New password</label><input type="password" id="rs-new" placeholder="Create a new password" autocomplete="off" style="text-align:left"></div>
+    <div class="fg" style="text-align:left"><label>Confirm new password</label><input type="password" id="rs-conf" placeholder="Confirm your new password" autocomplete="off" style="text-align:left"></div>
+    <div class="err" id="e5"></div>
+    <button class="btn" id="btn-update-password" style="width:100%">Update password</button></div>
+  <button class="btn ghost" id="btn-auth-cancel" style="width:100%;margin-top:12px">Cancel</button>
+</div></div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/storage.js"></script>
+<script src="js/state.js"></script>
+<script src="js/backend.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/qr-payment.js"></script>
+<script src="js/camera-scanner.js"></script>
+<script src="js/kiosk.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

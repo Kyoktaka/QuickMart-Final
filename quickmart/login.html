@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickMart – Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/animations.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/modals.css">
+<link rel="stylesheet" href="css/login.css">
+<link rel="stylesheet" href="css/toast.css">
+<link rel="stylesheet" href="css/responsive.css">
+<link rel="stylesheet" href="css/login-background.css">
+
+</head>
+<body class="locked">
+
+<!-- LOGIN / SIGNUP -->
+<div id="login">
+  <div class="lg-brand" aria-hidden="true">
+    <div class="lg-logo">
+      <svg viewBox="0 0 140 140" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h22l18 74h66"/><circle cx="58" cy="124" r="13"/><rect x="52" y="8" width="78" height="64" rx="12"/><path d="M72 26v28M82 24v30M92 24v30M102 26v28M112 28v24" stroke-width="7"/></svg>
+      <span>QuickMart</span>
+    </div>
+  </div>
+  <div class="lg-wrap">
+
+    <!-- SIGN IN FORM -->
+    <form class="lg-form active" id="login-form" novalidate>
+      <h1>Welcome back!</h1>
+      <p class="lg-sub">Sign in with your manager credentials.</p>
+      <label for="login-user">Gmail</label>
+      <div class="lg-field"><input id="login-user" type="email" placeholder="@gmail.com" autocomplete="email"></div>
+      <label for="login-pass">Password</label>
+      <div class="lg-field"><input id="login-pass" type="password" placeholder="****************" autocomplete="current-password">
+        <button type="button" class="lg-eye" id="login-eye" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10c2.8 3.9 5.9 5.5 9 5.5s6.2-1.6 9-5.5"/><path d="M6.4 13.6l-1.8 2.4M10.2 15.1l-.7 2.8M13.8 15.1l.7 2.8M17.6 13.6l1.8 2.4"/></svg></button></div>
+      <button type="button" class="lg-forgot" id="btn-forgot-login">Forgot Password?</button>
+      <div class="lg-err" id="login-err" role="alert"></div>
+      <button type="submit" class="lg-btn" id="btn-login">Sign In <svg viewBox="0 0 36 24" aria-hidden="true"><path d="M3 12h28M22 3l9 9-9 9"/></svg></button>
+      <p class="lg-switch">Don't have an account? <a id="link-to-signup" href="#">Create one</a></p>
+    </form>
+
+    <!-- SIGN UP FORM -->
+    <form class="lg-form" id="signup-form" novalidate>
+      <h1>Create account</h1>
+      <p class="lg-sub">Register a new manager account.</p>
+      <label for="signup-user">Username</label>
+      <div class="lg-field"><input id="signup-user" type="text" placeholder="Enter your username" autocomplete="username"></div>
+      <label for="signup-gmail">Gmail</label>
+      <div class="lg-field"><input id="signup-gmail" type="email" placeholder="@gmail.com" autocomplete="email"></div>
+      <label for="signup-pass">Password</label>
+      <div class="lg-field"><input id="signup-pass" type="password" placeholder="Create a password (at least 6 characters)" autocomplete="new-password">
+        <button type="button" class="lg-eye" id="signup-eye" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10c2.8 3.9 5.9 5.5 9 5.5s6.2-1.6 9-5.5"/><path d="M6.4 13.6l-1.8 2.4M10.2 15.1l-.7 2.8M13.8 15.1l.7 2.8M17.6 13.6l1.8 2.4"/></svg></button></div>
+      <label for="signup-conf">Confirm Password</label>
+      <div class="lg-field"><input id="signup-conf" type="password" placeholder="Re-enter your password" autocomplete="new-password">
+        <button type="button" class="lg-eye" id="signup-conf-eye" aria-label="Show confirm password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10c2.8 3.9 5.9 5.5 9 5.5s6.2-1.6 9-5.5"/><path d="M6.4 13.6l-1.8 2.4M10.2 15.1l-.7 2.8M13.8 15.1l.7 2.8M17.6 13.6l1.8 2.4"/></svg></button></div>
+      <div class="lg-err" id="signup-err" role="alert"></div>
+      <button type="submit" class="lg-btn" id="btn-signup">Sign Up <svg viewBox="0 0 36 24" aria-hidden="true"><path d="M3 12h28M22 3l9 9-9 9"/></svg></button>
+      <p class="lg-switch">Already have an account? <a id="link-to-login" href="#">Sign In</a></p>
+    </form>
+
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="modal" id="m-auth" role="dialog" aria-modal="true"><div class="mbox">
+  <h2 id="auth-title"></h2>
+  <div class="astep on" id="as1"><h3>Layer 1 of 3 · RFID scan</h3><p class="sub">Tap your manager card on the reader.</p>
+    <div class="pad">Waiting for card…</div><div class="err" id="e1"></div></div>
+  <div class="astep" id="as2"><h3>Password verification</h3><p class="sub">Enter your manager password.</p>
+    <div class="fg" style="margin-top:14px"><input type="password" id="auth-pw" placeholder="Enter manager password" autocomplete="off"></div><div class="err" id="e2"></div>
+    <button class="btn" id="btn-pw" style="width:100%">Verify password</button></div>
+  <div class="astep" id="as3"><h3>Layer 3 of 3 · Master key</h3><p class="sub">Enter the master key to authorize.</p>
+    <div class="fg" style="margin-top:14px"><input type="password" id="auth-mk" placeholder="Enter master key" autocomplete="off"></div><div class="err" id="e3"></div>
+    <button class="btn" id="btn-mk" style="width:100%">Authorize</button>
+    <button class="link" id="btn-forgot">Reset or change password</button></div>
+  <div class="astep" id="as4"><h3>Reset Password</h3><p class="sub">Enter your registered Gmail address to receive reset instructions.</p>
+    <div class="fg" style="margin-top:14px;text-align:left"><label>Gmail address</label><input type="email" id="rs-gmail" placeholder="e.g. manager@gmail.com" autocomplete="off" style="text-align:left"></div>
+    <div class="err" id="e4"></div>
+    <button class="btn" id="btn-gmail-received" style="width:100%">Gmail received</button></div>
+  <div class="astep" id="as5"><h3>Set New Password</h3><p class="sub">Please enter your new password below.</p>
+    <div class="fg" style="margin-top:14px;text-align:left"><label>New password</label><input type="password" id="rs-new" placeholder="Create a new password" autocomplete="off" style="text-align:left"></div>
+    <div class="fg" style="text-align:left"><label>Confirm new password</label><input type="password" id="rs-conf" placeholder="Confirm your new password" autocomplete="off" style="text-align:left"></div>
+    <div class="err" id="e5"></div>
+    <button class="btn" id="btn-update-password" style="width:100%">Update password</button></div>
+  <button class="btn ghost" id="btn-auth-cancel" style="width:100%;margin-top:12px">Cancel</button>
+</div></div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/storage.js"></script>
+<script src="js/state.js"></script>
+<script src="js/backend.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>

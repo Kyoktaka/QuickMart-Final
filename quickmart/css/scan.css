@@ -1,0 +1,6 @@
+/* scan.css – Product Recognition start page */
+.cfd-card{background:#fff;margin-top:36px;padding:60px;text-align:center;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid #e4e8e4;animation:fadeInUp .5s ease}
+.cfd-card h2{font-size:1.5rem;color:#000}
+.cfd-card p{margin:8px 0 22px;color:var(--mute);line-height:1.6}
+.scan-icon{font-size:65px;color:var(--primary-orange);margin-bottom:1rem;animation:countUp .6s ease}
+.start-btn{font-size:1rem;padding:12px 28px;animation:pulseGlow 2s infinite}
