@@ -20,5 +20,7 @@ jobs:
         run: node tests/rfid-scanner.js
       - name: Multi-tag restocking and product isolation tests
         run: node tests/inventory-batch.js
+      - name: RFID kiosk twenty-tag and removal tests
+        run: node tests/kiosk-presence.js
       - name: Final frontend integration smoke tests
         run: node tests/integration-smoke.js
