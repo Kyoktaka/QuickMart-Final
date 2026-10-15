@@ -13,6 +13,8 @@ function openAuth(cb,step=2){
   authStep([4,5].includes(step)?step:2);openModal('m-auth');
 }
 function closeAuth(){
+  // A focused hidden manager password field must not intercept resumed RFID reads.
+  if(document.activeElement?.closest?.('#m-auth'))document.activeElement.blur();
   closeModal('m-auth');state.authCb=null;
   if(window.RFIDScanner&&state.kioskOn&&($('#k-idle')?.classList.contains('on')||$('#k-cart')?.classList.contains('on'))){RFIDScanner.enable()}
 }
