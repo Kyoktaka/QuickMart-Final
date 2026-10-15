@@ -82,6 +82,39 @@ forward to `manager/login.html`.
 Run `node tests/integration-smoke.js` to check page assets, links, reset
 routing, API relative paths, and RFID behavior.
 
+## USB HID RFID typing protection (October 16, 2026)
+
+Some inexpensive UHF readers appear to Windows as USB **keyboards**. Even
+when QuickMart pauses RFID detection for manager authentication, unplugged
+hardware is not implied: a reader in continuous mode can still type EPCs
+directly into a focused browser password, email, search, or product field.
+
+Every active `manager/*.html` page now loads `js/rfid-input-guard.js`
+before the app's regular scripts. It intercepts keyboard-wedge character
+bursts **before** they reach input fields, discards fast EPC-like sequences,
+and releases ordinary human keyboard text (including Search `input` events).
+The RFID scanner remains logically disabled while the manager password
+dialog is shown. The filtering does not change checkout, cart values, or
+user-visible timers.
+
+**Hardware limitation:** browsers cannot definitively distinguish keystrokes
+from a scanner and from an ordinary keyboard when both use the same USB
+keyboard emulation. This timing/pattern filter is a best-effort protection,
+not a security boundary or perfect keyboard-source detector. Particularly
+slow tag output, unusual EPC syntax, simultaneous manual typing/scans, and
+extremely fast human input may still cause interference. To guarantee
+separation, configure the vendor reader to pause continuous inventory while
+credentials are entered, set a unique prefix/suffix supported by the
+reader and filter on it, or use its vendor HID/serial SDK with a dedicated
+reader input channel. Never rely on `RFIDScanner.disable()` to stop a
+physical USB keyboard device.
+
+Run `node tests/rfid-input-guard.js` for simulated credential/search
+typing and repeated EPC tests, and then test manager Exit + Password while
+RFID tags remain in the 18 × 12 × 12-inch scanning box on real hardware.
+If the reader still enters characters into any form input, vendor-level
+reader configuration or a non-keyboard transport is required.
+
 ## RFID integration
 
 The assets/js/rfid-scanner.js handler captures EPCs from the USB HID
