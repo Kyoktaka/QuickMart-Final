@@ -140,15 +140,43 @@ Existing incorrect assignments are **not** automatically changed.
 Use docs/RFID_TAG_AUDIT.md to inspect and correct verified EPCs.
 
 The HID reader reports EPC reads, not an authoritative in/out presence flag.
-Short gaps between multi-tag reads are tolerated (first-read 6-second window,
-adaptive 4.5–9-second window after repeats; plus brief empty-tray settling).
-The cart remains as long as the device keeps reporting each tag. If the reader
-only outputs an EPC once or periodically skips a still-present tag for longer,
-the web page cannot know it remains in range; configure the reader for repeated
-HID EPC output or use a vendor inventory API. Software cannot guarantee both
-zero false-removals and instant physical removal from single-shot key events.
-The requested 14x16-inch platform and 12–13-inch height are *physical RF*
-constraints: tune and test the antenna/reader, not just the JavaScript timer.
+For multi-tag groups, software now retains first sightings longer as the
+population increases (about 6–14 seconds for 1–20 unique tags, max 16 seconds).
+After repeated reads, a per-EPC adaptive allowance uses approximately three
+observed read cycles (minimum 4.5 seconds, maximum 22 seconds). This reduces
+20-tag flicker while still allowing a genuinely removed tag to disappear.
+These are INTERNAL tolerances, not visible timers or guaranteed removal delays.
+Checkout QR payment has its own separate payment deadline.
+
+The kiosk coalesces rapid tray changes into one PHP lookup, serializes backend
+requests and ignores stale replies. It only clears an empty tray after a brief
+settling interval; one tag removal should decrease that product's quantity
+while other repeatedly read tags remain present.
+
+**Important hardware limit:** If the reader emits every tag only once, or
+misses a present EPC for longer than the read-gap tolerance, the browser
+cannot distinguish removal from a missed read. No software change can
+guarantee permanent on-screen presence AND automatic physical removal in
+one-shot USB keyboard mode. Configure continuous/inventory/repeat EPC output
+using the exact reader vendor's instructions, or integrate its supported
+inventory API (if available) for stronger presence data.
+
+The physical scanning platform is **18 x 12 x 12 inches**. Start with a reader
+under its horizontal center (9 inches from the short edge, 6 inches from the
+long edge), antenna face upward, under a thin NON-METAL floor. This is only a
+test mounting position, not guaranteed RF coverage. For reliable 20-tag
+scanning test 1, 5, 10, 15 and 20 tags for at least 30–60 seconds each, then
+repeat with single-tag removal. Adjust tag spacing, antenna-to-tag distance,
+orientation, and packaging before claiming 20-tag capacity. Metal/liquid
+products often need specialist RFID tag placement. PHP requests accept up to
+100 EPCs, but this is NOT a verified hardware multi-tag capacity.
+
+Use `RFIDScanner.getReadHealth()` and `RFIDScanner.getDiagnostics()` in
+the browser console on the authenticated kiosk for live read-cycle and
+last-read diagnostics. No reader debug/expiry countdown is shown on screen.
+Run `node tests/rfid-scanner.js`, `node tests/kiosk-presence.js` and
+`node tests/integration-smoke.js` for simulated regression tests. Physical
+USB/UHF hardware must be tested locally.
 
 ## Authentication / password reset UI
 

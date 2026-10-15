@@ -1,5 +1,6 @@
 /* Original QuickMart kiosk design, server-authoritative RFID and transactions. */
 let timerId=null,left=TIMEOUT,trayRevision=0,emptyTimer=null,blockedTimer=null;
+let detectDebounce=null,detectInFlight=false,latestSnapshot=[];
 const loggedSessions=new Set(),manuallyEnteredEpcs=new Set(),blockedShownAt=new Map();
 const cartTotal=()=>state.cart.reduce((n,i)=>n+i.price*i.qty,0);
 const cartQty=()=>state.cart.reduce((n,i)=>n+i.qty,0);
@@ -33,7 +34,8 @@ async function finalize(status,reason){
   catch(e){toast('Could not save checkout attempt: '+e.message,'error')}
 }
 function resetKiosk(){
-  clearTimeout(emptyTimer);emptyTimer=null;clearTimeout(blockedTimer);stopTimer();stopCameraScanner();trayRevision++;
+  clearTimeout(emptyTimer);emptyTimer=null;clearTimeout(detectDebounce);detectDebounce=null;
+  latestSnapshot=[];clearTimeout(blockedTimer);stopTimer();stopCameraScanner();trayRevision++;
   state.cart=[];state.current=null;state.processing=false;manuallyEnteredEpcs.clear();
   closeModal('m-tag');closeModal('m-blocked');screen('k-idle');
 }
@@ -55,16 +57,30 @@ function notifyBlocked(epc){
   const product=state.products.find(p=>p.id===Number(tag?.product_id));
   showBlocked(product?.name||'RFID '+epc);
 }
-async function refreshTray(snapshot){
-  const epcs=[...new Set([...snapshot,...manuallyEnteredEpcs].map(e=>String(e).trim().toUpperCase()))];
-  const revision=++trayRevision;clearTimeout(emptyTimer);emptyTimer=null;
-  if(!epcs.length){
+// Reader events may report 20 EPCs in rapid bursts. Coalesce snapshots and
+// serialize PHP lookups so stale responses never flash partial carts on screen.
+function queueTray(snapshot){
+  latestSnapshot=[...new Set([...snapshot,...manuallyEnteredEpcs]
+    .map(epc=>String(epc).trim().toUpperCase()).filter(Boolean))];
+  const revision=++trayRevision;
+  clearTimeout(detectDebounce);detectDebounce=null;
+  clearTimeout(emptyTimer);emptyTimer=null;
+  if(!latestSnapshot.length){
     emptyTimer=setTimeout(()=>{
       if(revision!==trayRevision||!state.kioskOn||!RFIDScanner.isEnabled()||
         RFIDScanner.getPresentEpcs().length||manuallyEnteredEpcs.size)return;
       state.cart=[];state.current=null;renderCart();screen('k-idle');
-    },1200);return;
+    },1200);
+    return;
   }
+  // This short internal debounce is NOT an expiry timer or visible countdown.
+  detectDebounce=setTimeout(()=>{detectDebounce=null;
+    void refreshTray(latestSnapshot,revision);
+  },180);
+}
+async function refreshTray(epcs,revision){
+  if(detectInFlight||!state.kioskOn||!RFIDScanner.isEnabled())return;
+  detectInFlight=true;
   try{
     const res=await Backend.detect(epcs);
     if(revision!==trayRevision||!state.kioskOn||$('#k-qr').classList.contains('on'))return;
@@ -81,11 +97,21 @@ async function refreshTray(snapshot){
   }catch(e){
     if(revision===trayRevision)toast('RFID detection delayed: '+e.message,'error');
     // A database/network failure must NOT clear a verified cart.
+  }finally{
+    detectInFlight=false;
+    // Never discard a newer tray state just because an older lookup was busy.
+    if(revision!==trayRevision&&latestSnapshot.length&&state.kioskOn&&RFIDScanner.isEnabled()){
+      clearTimeout(detectDebounce);
+      const latestRevision=trayRevision;
+      detectDebounce=setTimeout(()=>{detectDebounce=null;
+        void refreshTray(latestSnapshot,latestRevision);
+      },100);
+    }
   }
 }
 window.addEventListener('rfid:tray',e=>{
   if(!state.kioskOn||(!$('#k-idle').classList.contains('on')&&!$('#k-cart').classList.contains('on'))||!RFIDScanner.isEnabled())return;
-  void refreshTray(e.detail||[]);
+  queueTray(e.detail||[]);
 });
 function openTagModal(){
   $('#tag-modal-input').value='';openModal('m-tag');setTimeout(()=>$('#tag-modal-input').focus(),60);
@@ -100,7 +126,7 @@ async function submitTagModal(){
     if(r.purchased_epcs?.includes(epc)){notifyBlocked(epc);return}
     if(!r.grouped_items?.length){toast('EPC not registered or product unavailable','error');return}
     manuallyEnteredEpcs.add(epc);field.value='';closeModal('m-tag');
-    await refreshTray(RFIDScanner.getPresentEpcs());
+    queueTray(RFIDScanner.getPresentEpcs());
   }catch(e){toast(e.message,'error')}
 }
 $('#btn-idle-tag').onclick=openTagModal;$('#btn-input-tag-toggle').onclick=openTagModal;
@@ -112,7 +138,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal('m-tag')
 $('#btn-checkout').onclick=()=>{if(!state.cart.length)return toast('Scan a product first','error');
   renderCart();screen('k-qr');startTimer();void startCameraScanner()};
 $('#btn-retry').onclick=()=>{state.current=Backend.newSessionId();screen('k-qr');startTimer();void startCameraScanner()};
-$('#btn-qr-back').onclick=()=>screen('k-cart');
+$('#btn-qr-back').onclick=()=>{screen('k-cart');queueTray(RFIDScanner.getPresentEpcs());};
 $('#btn-cancel-scan').onclick=async()=>{stopTimer();await stopCameraScanner();await finalize('cancelled','Customer cancelled');resetKiosk()};
 async function completePayment(receipt){
   stopTimer();await stopCameraScanner();

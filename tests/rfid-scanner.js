@@ -78,3 +78,36 @@ const diagnostics=reader.getDiagnostics();
 assert.equal(diagnostics.length,1);
 assert.equal(diagnostics[0].expiryToleranceMs,6000);
 console.log('Continuous reader EPC presence/removal and restock tests passed');
+
+
+// Twenty-tag tray: all tags initially show and stay present after ordinary
+// multi-tag reader cycles. Removing one tag must eventually decrease 20 -> 19
+// without clearing the other 19 or showing any scan countdown.
+reader.disable();reader.enable();
+const twenty=Array.from({length:20},(_,i)=>
+  'E28011700000021905'+String(i+1).padStart(6,'0'));
+for(const tag of twenty)scan(tag);
+assert.equal(reader.getPresentEpcs().length,20,'20 distinct EPCs must fit in the reader map');
+now+=7000;intervalFn();
+assert.equal(reader.getPresentEpcs().length,20,
+  'Busy 20-tag initial round must not erase single-read EPCs after 6 seconds');
+for(const tag of twenty)scan(tag);
+intervalFn();
+assert.equal(reader.getPresentEpcs().length,20);
+const removed=twenty[7];
+for(let round=0;round<7;round++){
+  for(const tag of twenty)if(tag!==removed)scan(tag);
+  intervalFn();
+}
+assert.equal(reader.getPresentEpcs().includes(removed),false,
+  'Tag removed during continuous inventory must eventually expire');
+assert.equal(reader.getPresentEpcs().length,19,
+  '19 actively reread tags must stay on screen while the removed one expires');
+const diag=reader.getReadHealth();
+assert.equal(diag.trackedTags,19);
+assert(diag.estimatedInventoryCycleMs>0,'Estimate continuous inventory cycle from reads');
+now+=24000;intervalFn();
+assert.equal(reader.getPresentEpcs().length,0,
+  'When reader stops reporting ALL tags, inferred presence eventually clears');
+reader.disable();
+console.log('20-tag inventory stability and individual removal regression tests passed');
