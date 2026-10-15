@@ -9,6 +9,7 @@ function el(selector){
   if(!elements.has(selector)){
     const classes=new Set();
     elements.set(selector,{
+      id:selector.startsWith('#')?selector.slice(1):'',
       innerHTML:'',textContent:'',value:'',onclick:null,
       classList:{
         contains:cl=>classes.has(cl),add:cl=>classes.add(cl),remove:cl=>classes.delete(cl),
