@@ -79,9 +79,12 @@
   }
   document.addEventListener('keydown',event=>{
     if(!enabled||event.ctrlKey||event.altKey||event.metaKey)return;
-    // Ignore typing into forms (including the manual EPC input modal).
+    // Normal physical keyboard input into editable fields must pass through.
+    // During a scan batch, the read-only EPC list can be focused without
+    // interrupting reader capture. Its readonly state prevents HID text edits.
     const active=document.activeElement;
-    if(active&&(['INPUT','TEXTAREA','SELECT'].includes(active.tagName)||active.isContentEditable))return;
+    const safeScanList=active?.id==='epc-code'&&active.readOnly===true;
+    if(active&&!safeScanList&&(['INPUT','TEXTAREA','SELECT'].includes(active.tagName)||active.isContentEditable))return;
     const now=performance.now(),burst=now-lastKeyAt<=KEY_GAP_MS;
     lastKeyAt=now;
     if(event.key==='Enter'){
