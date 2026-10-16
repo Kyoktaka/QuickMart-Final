@@ -34,11 +34,19 @@ const inventoryHtml=fs.readFileSync(path.join(root,'manager/inventory.html'),'ut
 const inventoryJs=fs.readFileSync(path.join(root,'js/inventory.js'),'utf8');
 assert(inventoryHtml.includes('<textarea id="epc-code"'),'EPC entry must be multiline');
 assert(!inventoryHtml.includes('<input id="epc-code"'),'Old single-line EPC box must be absent');
-assert(inventoryHtml.includes('data-epc-ui="multiline-v3"'),'EPC UI version marker missing');
-assert(inventoryHtml.includes('inventory.js?v=epc-multiline-v3'),'Inventory JS must be cache-busted');
-assert(inventoryHtml.includes('inventory.css?v=epc-multiline-v3'),'Inventory CSS must be cache-busted');
+assert(inventoryHtml.includes('data-epc-ui="scan-only-v4"'),'EPC UI version marker missing');
+assert(inventoryHtml.includes('inventory.js?v=epc-scan-only-v4'),'Inventory JS must be cache-busted');
+assert(inventoryHtml.includes('inventory.css?v=epc-scan-only-v4'),'Inventory CSS must be cache-busted');
 assert(!inventoryHtml.includes('No EPCs captured yet.'),'Do not show an extra subtitle below EPC list');
 assert(!inventoryJs.includes("unique EPC'+"),'Old EPC subtitle output must never reappear');
+assert(/<textarea\b[^>]*id="epc-code"[^>]*\breadonly\b/.test(inventoryHtml),
+  'EPC textarea must remain read-only even before JS loads');
+assert(!/paste or type/i.test(inventoryHtml),
+  'EPC display must not invite manual typing or pasting');
+assert(!inventoryJs.includes('importEpcEditor')&&!inventoryJs.includes('parseEpcEditor'),
+  'EPC registration must never read manually edited textarea contents');
+assert(inventoryJs.includes("field.readOnly=true"),
+  'Scan display must never unlock after Stop Scanning');
 assert(inventoryJs.includes("field.value=[...pendingEpcs].join('\\n')"),
   'All scanned EPCs must populate the multiline box, one per line');
 
