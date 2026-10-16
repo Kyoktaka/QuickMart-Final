@@ -82,38 +82,42 @@ forward to `manager/login.html`.
 Run `node tests/integration-smoke.js` to check page assets, links, reset
 routing, API relative paths, and RFID behavior.
 
-## USB HID RFID typing protection (October 16, 2026)
+## Physical keyboard and multi-tag EPC editor (October 16, 2026)
 
-Some inexpensive UHF readers appear to Windows as USB **keyboards**. Even
-when QuickMart pauses RFID detection for manager authentication, unplugged
-hardware is not implied: a reader in continuous mode can still type EPCs
-directly into a focused browser password, email, search, or product field.
+The previous global keyboard timing filter has been removed from all manager
+pages because it also delayed or sometimes suppressed real physical keyboard
+input, including passwords, product searches and edits. Normal input fields
+now receive manual typing **immediately**. When the page's RFID reader
+scanner logic is enabled, it ignores focused editable inputs. The inventory
+EPC field is special: it is **readonly only during active Scan** so HID
+scanner output can still be captured even if that field has focus.
 
-Every active `manager/*.html` page now loads `js/rfid-input-guard.js`
-before the app's regular scripts. It intercepts keyboard-wedge character
-bursts **before** they reach input fields, discards fast EPC-like sequences,
-and releases ordinary human keyboard text (including Search `input` events).
-The RFID scanner remains logically disabled while the manager password
-dialog is shown. The filtering does not change checkout, cart values, or
-user-visible timers.
+Inventory > Assign EPC Tag now uses a multiline EPC code field with **all
+unique scanned tags visible, one EPC per line**. The duplicate secondary
+"No EPCs captured yet" line is replaced with a count next to the field
+label. During Start Scanning, USB-HID EPCs append to the main EPC field
+without adding the same EPC twice. Stop Scanning unlocks the field so the
+manager can manually type/paste, review, add or remove EPC codes; Register
+submits the final unique validated list for the single selected product.
+Manual EPCs can be entered before Start Scanning as well. The 100-EPC
+per-batch server limit remains unchanged. Switching the selected product
+discards the batch after confirmation.
 
-**Hardware limitation:** browsers cannot definitively distinguish keystrokes
-from a scanner and from an ordinary keyboard when both use the same USB
-keyboard emulation. This timing/pattern filter is a best-effort protection,
-not a security boundary or perfect keyboard-source detector. Particularly
-slow tag output, unusual EPC syntax, simultaneous manual typing/scans, and
-extremely fast human input may still cause interference. To guarantee
-separation, configure the vendor reader to pause continuous inventory while
-credentials are entered, set a unique prefix/suffix supported by the
-reader and filter on it, or use its vendor HID/serial SDK with a dedicated
-reader input channel. Never rely on `RFIDScanner.disable()` to stop a
-physical USB keyboard device.
+**Critical hardware caveat:** keyboard-wedge RFID scanners and human USB
+keyboards emit indistinguishable browser keyboard events. Disabling the
+JavaScript scanner does not disable the physical scanner. With continuous
+RFID reads, tag EPCs can still appear in focused form inputs unless the
+reader itself is paused/reconfigured, uses a vendor-defined prefix plus
+reliable device-specific filtering, or communicates through dedicated
+non-keyboard HID/serial/SDK input. We deliberately do NOT globally block
+typing again. Verify the particular reader model/firmware supports
+continuous inventory pause or separate device transport before promising
+fully independent simultaneous manual typing and scanning.
 
-Run `node tests/rfid-input-guard.js` for simulated credential/search
-typing and repeated EPC tests, and then test manager Exit + Password while
-RFID tags remain in the 18 × 12 × 12-inch scanning box on real hardware.
-If the reader still enters characters into any form input, vendor-level
-reader configuration or a non-keyboard transport is required.
+Run `node tests/manual-keyboard.js`, `node tests/inventory-batch.js`
+and `node tests/rfid-scanner.js` for regression coverage. Test actual
+reader output and a physical keyboard locally; simulation cannot identify
+the device that generated a key.
 
 ## RFID integration
 
