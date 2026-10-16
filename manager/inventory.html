@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="../css/modals.css">
 <link rel="stylesheet" href="../css/toast.css">
 <link rel="stylesheet" href="../css/responsive.css">
-<link rel="stylesheet" href="../css/inventory.css?v=epc-multiline-v3">
+<link rel="stylesheet" href="../css/inventory.css?v=epc-scan-only-v4">
 <script src="../js/guard.js"></script>
 </head>
 <body>
@@ -78,14 +78,14 @@
 </div></div>
 
 <!-- EPC MODAL -->
-<div class="modal" id="m-epc" data-epc-ui="multiline-v3" role="dialog" aria-modal="true"><div class="mbox">
-  <h2>Assign EPC tag</h2><p class="d">Select a product, then scan its UHF tag. Stock increases by 1 for each tag assigned.</p>
+<div class="modal" id="m-epc" data-epc-ui="scan-only-v4" role="dialog" aria-modal="true"><div class="mbox">
+  <h2>Assign EPC tags</h2><p class="d">Select a product and scan its UHF RFID tags. Each unique detected tag is shown below; tags are registered only when you confirm the batch.</p>
   <div class="fg"><label for="epc-product">Product</label><select id="epc-product"></select></div>
   <div class="fg"><label>Category</label><input id="epc-cat" readonly></div>
   <div class="fg"><label>Current stock</label><input id="epc-stock" readonly></div>
   <div class="fg"><label>Price</label><input id="epc-price" readonly></div>
   <div class="fg"><label for="epc-code" class="epc-list-label">EPC codes <span id="epc-captured" aria-live="polite">0 tags</span></label>
-    <textarea id="epc-code" class="epc-multi-list" rows="9" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Scanned EPCs appear here, one per line. You can also paste or type multiple EPCs before or after scanning."></textarea>
+    <textarea id="epc-code" class="epc-multi-list" rows="9" readonly aria-readonly="true" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Scanned RFID tags appear here automatically, one EPC per line."></textarea>
   </div>
   <div class="err" id="ee"></div>
   <div class="mfoot"><button class="btn ghost" data-close="m-epc">Close</button><button class="btn ghost" type="button" id="epc-clear">Clear</button><button class="btn" type="button" id="epc-arm">Start Scanning</button></div>
@@ -96,8 +96,8 @@
 <script src="../js/state.js"></script>
 <script src="../js/backend.js"></script>
 <script src="../js/helpers.js"></script>
-<script src="../assets/js/rfid-scanner.js?v=epc-multiline-v3"></script>
-<script src="../js/inventory.js?v=epc-multiline-v3"></script>
+<script src="../assets/js/rfid-scanner.js?v=epc-scan-only-v4"></script>
+<script src="../js/inventory.js?v=epc-scan-only-v4"></script>
 <script src="../js/main.js"></script>
 </body>
 </html>
