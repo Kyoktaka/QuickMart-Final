@@ -75,7 +75,7 @@ function fillEpc(){
 /* Scan many EPCs into ONE editable multiline list. A USB keyboard-emulation
    reader types EPCs as keystrokes, so scan capture is only enabled on the
    intentional inventory Scan stage, never while editing the EPC field. */
-let restockPhase='idle',restockProductId=null,restockBusy=false;
+let restockPhase='idle',restockProductId=null,restockBusy=false,lastSelectedProductId=null;
 const pendingEpcs=new Set(),MAX_BATCH=100;
 const EPC_PATTERN=/^[A-Z0-9:_-]{1,100}$/;
 function parseEpcEditor(){
@@ -111,18 +111,20 @@ function openEpc(id){
   if(!active.length)return toast('Add or activate a product first');
   resetPending();$('#epc-product').innerHTML=active.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
   if(id)$('#epc-product').value=id;
+  lastSelectedProductId=Number($('#epc-product').value);
   fillEpc();openModal('m-epc');
   $('#ee').textContent='Scan tags for the selected product, stop, review, then register the batch.';
 }
 $('#btn-epc-mode').onclick=()=>openEpc();
 $('#epc-product').onchange=()=>{
-  if(restockBusy){$('#epc-product').value=restockProductId;return}
+  const nextProductId=Number($('#epc-product').value);
+  if(restockBusy){$('#epc-product').value=String(lastSelectedProductId);return}
   // Include manually typed EPCs in the discard confirmation.
   const hasCodes=pendingEpcs.size||$('#epc-code').value.trim();
   if(hasCodes&&!confirm('Discard pending EPC tags for previous product?')){
-    $('#epc-product').value=restockProductId||$('#epc-product').value;return;
+    $('#epc-product').value=String(lastSelectedProductId);return;
   }
-  resetPending();fillEpc();
+  resetPending();lastSelectedProductId=nextProductId;fillEpc();
 };
 $('#epc-code').addEventListener('input',()=>{
   if(restockBusy||restockPhase==='capturing')return;
