@@ -118,7 +118,7 @@ reader.enable();
 const slowEpc='E2827802000000000DFFD26D';
 for(const c of slowEpc){key(c);now+=145}
 key('Enter');
-assert.deepEqual(reader.getPresentEpcs(),[slowEpc],
+assert.deepEqual([...reader.getPresentEpcs()],[slowEpc],
   'Slow multi-tag HID keystrokes must still form one COMPLETE EPC');
 reader.disable();
 console.log('Slow 24-character USB HID EPC framing regression passed');
