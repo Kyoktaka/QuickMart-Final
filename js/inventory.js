@@ -100,7 +100,7 @@ function drawPending(syncList=false){
   field.readOnly=restockBusy||restockPhase==='capturing';
   if(syncList)field.value=[...pendingEpcs].join('\n');
   $('#epc-captured').textContent=count+' tag'+(count===1?'':'s');
-  $('#epc-arm').textContent=restockPhase==='capturing'?\u0060Stop Scanning (${count})\u0060:restockPhase==='review'?\u0060Register ${count} Tag${count===1?'':'s'}\u0060:'Start Scanning';
+  $('#epc-arm').textContent=restockPhase==='capturing'?`Stop Scanning (${count})`:restockPhase==='review'?`Register ${count} Tag${count===1?'':'s'}`:'Start Scanning';
   $('#epc-arm').disabled=restockBusy;$('#epc-clear').disabled=restockBusy;
 }
 function resetPending(){
@@ -109,7 +109,7 @@ function resetPending(){
 function openEpc(id){
   const active=state.products.filter(p=>p.active!==false);
   if(!active.length)return toast('Add or activate a product first');
-  resetPending();$('#epc-product').innerHTML=active.map(p=>\u0060<option value="${p.id}">${esc(p.name)}</option>\u0060).join('');
+  resetPending();$('#epc-product').innerHTML=active.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
   if(id)$('#epc-product').value=id;
   fillEpc();openModal('m-epc');
   $('#ee').textContent='Scan tags for the selected product, stop, review, then register the batch.';
