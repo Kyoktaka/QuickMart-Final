@@ -72,39 +72,23 @@ function fillEpc(){
   $('#epc-cat').value=p.category;$('#epc-stock').value=p.stock;$('#epc-price').value=peso(p.price);
   $('#epc-code').value='';$('#ee').textContent='';
 }
-/* Scan many EPCs into ONE editable multiline list. A USB keyboard-emulation
-   reader types EPCs as keystrokes, so scan capture is only enabled on the
-   intentional inventory Scan stage, never while editing the EPC field. */
+/* The EPC box is scanner-only and ALWAYS read-only. Every unique RFID
+   reading appears on its own line, even after Stop Scanning. Normal typing
+   remains available in actual product-edit/search/checkout inputs. */
 let restockPhase='idle',restockProductId=null,restockBusy=false,lastSelectedProductId=null;
 const pendingEpcs=new Set(),MAX_BATCH=100;
 const EPC_PATTERN=/^[A-Z0-9:_-]{1,100}$/;
-function parseEpcEditor(){
-  const raw=$('#epc-code').value.trim();
-  const tokens=raw?raw.split(/[\s,;]+/).filter(Boolean):[];
-  const values=[...new Set(tokens.map(epc=>epc.toUpperCase()))];
-  if(values.length>MAX_BATCH)return {error:'Maximum '+MAX_BATCH+' unique EPC tags per registration batch.'};
-  const invalid=values.filter(epc=>!EPC_PATTERN.test(epc));
-  if(invalid.length)return {error:'Invalid EPC format: '+invalid.slice(0,3).join(', ')};
-  return {values};
-}
-function importEpcEditor(){
-  const parsed=parseEpcEditor();
-  if(parsed.error){$('#ee').textContent=parsed.error;return false}
-  pendingEpcs.clear();
-  parsed.values.forEach(epc=>pendingEpcs.add(epc));
-  $('#ee').textContent='';
-  return true;
-}
-function drawPending(syncList=false){
+function drawPending(){
   const count=pendingEpcs.size,field=$('#epc-code');
-  field.readOnly=restockBusy||restockPhase==='capturing';
-  if(syncList)field.value=[...pendingEpcs].join('\n');
+  // Never unlock: EPCs come exclusively from successful RFIDScanner reads.
+  field.readOnly=true;
+  field.value=[...pendingEpcs].join('\n');
   $('#epc-captured').textContent=count+' tag'+(count===1?'':'s');
   $('#epc-arm').textContent=restockPhase==='capturing'?`Stop Scanning (${count})`:restockPhase==='review'?`Register ${count} Tag${count===1?'':'s'}`:'Start Scanning';
   $('#epc-arm').disabled=restockBusy;$('#epc-clear').disabled=restockBusy;
 }
 function resetPending(){
-  window.RFIDScanner?.disable();pendingEpcs.clear();restockPhase='idle';restockProductId=null;drawPending(true);
+  window.RFIDScanner?.disable();pendingEpcs.clear();restockPhase='idle';restockProductId=null;drawPending();
 }
 function openEpc(id){
   const active=state.products.filter(p=>p.active!==false);
@@ -119,47 +103,36 @@ $('#btn-epc-mode').onclick=()=>openEpc();
 $('#epc-product').onchange=()=>{
   const nextProductId=Number($('#epc-product').value);
   if(restockBusy){$('#epc-product').value=String(lastSelectedProductId);return}
-  // Include manually typed EPCs in the discard confirmation.
-  const hasCodes=pendingEpcs.size||$('#epc-code').value.trim();
+  // Ask before discarding captured RFID tags for the previous product.
+  const hasCodes=pendingEpcs.size;
   if(hasCodes&&!confirm('Discard pending EPC tags for previous product?')){
     $('#epc-product').value=String(lastSelectedProductId);return;
   }
   resetPending();lastSelectedProductId=nextProductId;fillEpc();
 };
-$('#epc-code').addEventListener('input',()=>{
-  if(restockBusy||restockPhase==='capturing')return;
-  const parsed=parseEpcEditor();
-  if(parsed.error){$('#ee').textContent=parsed.error;return}
-  pendingEpcs.clear();parsed.values.forEach(epc=>pendingEpcs.add(epc));
-  $('#ee').textContent='';
-  drawPending(false);
-});
 $('#epc-clear').onclick=()=>{if(restockBusy)return;resetPending();$('#ee').textContent='Pending EPCs cleared; database unchanged.'};
 $$('#m-epc [data-close]').forEach(b=>b.addEventListener('click',resetPending));
 $('#epc-arm').onclick=async()=>{
   if(restockBusy)return;
   if(restockPhase==='idle'){
-    if(!importEpcEditor())return;
     restockProductId=Number($('#epc-product').value);
     if(!state.products.some(p=>p.id===restockProductId&&p.active!==false))return;
     restockPhase='capturing';document.activeElement?.blur();RFIDScanner.enable();
     $('#ee').textContent='Scanning tags for one selected product. Stop before changing product.';
-    drawPending(true);return;
+    drawPending();return;
   }
   if(restockPhase==='capturing'){
     RFIDScanner.disable();
-    // The field was readonly while scanning; it can now be edited.
     restockPhase=pendingEpcs.size?'review':'idle';
-    $('#ee').textContent=pendingEpcs.size?'Review the EPC list. You may edit it before registration.':'No EPCs captured. Check scanner connection.';
-    drawPending(true);return;
+    $('#ee').textContent=pendingEpcs.size?'Review the captured EPCs, then register the batch. The EPC box is display-only.':'No EPCs captured. Check scanner connection.';
+    drawPending();return;
   }
   if(restockPhase!=='review')return;
-  // Edits and manual pasted additions/removals are reflected in final batch.
-  if(!importEpcEditor())return;
-  if(!pendingEpcs.size){restockPhase='idle';drawPending(true);$('#ee').textContent='Enter or scan at least one EPC.';return}
+  // The pending Set is the source of truth; never trust textarea text as input.
+  if(!pendingEpcs.size){restockPhase='idle';drawPending();$('#ee').textContent='Scan at least one RFID EPC.';return}
   const id=restockProductId,epcs=[...pendingEpcs],product=state.products.find(p=>p.id===id);
   if(id!==Number($('#epc-product').value)||!product){resetPending();return}
-  restockBusy=true;drawPending(true);
+  restockBusy=true;drawPending();
   try{const r=await Backend.registerEpcs(id,epcs);
     const registered=r.registered_epcs||[],same=r.already_registered_epcs||[],other=r.already_registered_other_product_epcs||[];
     const invalid=r.invalid_epcs||[];
@@ -170,15 +143,15 @@ $('#epc-arm').onclick=async()=>{
     toast(registered.length+' tags registered');
     pendingEpcs.clear();restockPhase='idle';restockProductId=null;
   }catch(e){$('#ee').textContent=e.message}
-  finally{restockBusy=false;drawPending(!pendingEpcs.size)}
+  finally{restockBusy=false;drawPending()}
 };
 window.addEventListener('rfid:read',e=>{
   if(restockPhase!=='capturing'||restockBusy||!$('#m-epc').classList.contains('on'))return;
   if(restockProductId!==Number($('#epc-product').value)){resetPending();return}
   const epc=String(e.detail?.epc||'').trim().toUpperCase();
   if(!EPC_PATTERN.test(epc)||pendingEpcs.has(epc))return;
-  pendingEpcs.add(epc);drawPending(true);
+  pendingEpcs.add(epc);drawPending();
   if(pendingEpcs.size>=MAX_BATCH){RFIDScanner.disable();restockPhase='review';
-    $('#ee').textContent='100 tags captured. Review and register this batch.';drawPending(true)}
+    $('#ee').textContent='100 tags captured. Review and register this batch.';drawPending()}
 });
 window.PAGE_RENDER=renderInventory;
