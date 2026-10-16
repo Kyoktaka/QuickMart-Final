@@ -20,7 +20,7 @@ for(const p of pages){
   assert(fs.existsSync(target),name+' has broken asset/navigation path: '+ref);
  }
  for(const m of html.matchAll(/<script src="([^"]+)"/g)){
-  if(!/^https?:/i.test(m[1]))assert(fs.existsSync(path.resolve(root,'manager',m[1])),name+' missing '+m[1]);
+  if(!/^https?:/i.test(m[1]))assert(fs.existsSync(path.resolve(root,'manager',m[1].split(/[?#]/)[0])),name+' missing '+m[1]);
  }
  assert(html.includes('../js/backend.js'),name+' must load the real PHP API adapter');
  if(p==='inventory.html')for(const id of ['epc-product','epc-arm','epc-clear','epc-captured'])
@@ -28,6 +28,20 @@ for(const p of pages){
  if(['login.html','scan.html','kiosk.html'].includes(p))
   assert(html.includes('id="m-reset-confirm"'),name+' missing reset confirmation');
 }
+// EPC batch UI contract: all captured tags belong INSIDE the multiline field,
+// not in a subtitle below a single-line input. Asset versioning avoids stale JS.
+const inventoryHtml=fs.readFileSync(path.join(root,'manager/inventory.html'),'utf8');
+const inventoryJs=fs.readFileSync(path.join(root,'js/inventory.js'),'utf8');
+assert(inventoryHtml.includes('<textarea id="epc-code"'),'EPC entry must be multiline');
+assert(!inventoryHtml.includes('<input id="epc-code"'),'Old single-line EPC box must be absent');
+assert(inventoryHtml.includes('data-epc-ui="multiline-v3"'),'EPC UI version marker missing');
+assert(inventoryHtml.includes('inventory.js?v=epc-multiline-v3'),'Inventory JS must be cache-busted');
+assert(inventoryHtml.includes('inventory.css?v=epc-multiline-v3'),'Inventory CSS must be cache-busted');
+assert(!inventoryHtml.includes('No EPCs captured yet.'),'Do not show an extra subtitle below EPC list');
+assert(!inventoryJs.includes("unique EPC'+"),'Old EPC subtitle output must never reappear');
+assert(inventoryJs.includes("field.value=[...pendingEpcs].join('\\n')"),
+  'All scanned EPCs must populate the multiline box, one per line');
+
 const legacy=fs.readFileSync(path.join(root,'manager/reset-password.html'),'utf8');
 assert(legacy.includes("const target='login.html'+"));
 const mail=fs.readFileSync(path.join(root,'api/auth/forgot-password.php'),'utf8');

@@ -3,7 +3,10 @@
    No JavaScript setting can increase antenna RF range or guarantee 20-tag reads.
    This is an adaptive read-gap tolerance, not an on-screen countdown. */
 (() => {
-  const KEY_GAP_MS=85,MAX_EPC_LENGTH=100,MIN_EPC_LENGTH=6;
+  // Some USB-HID readers throttle each character during multi-tag inventory.
+  // 85ms split the middle of 24-character EPCs into multiple false fragments.
+  // Wait longer for a delayed suffix; Enter still flushes immediately.
+  const KEY_GAP_MS=240,IDLE_FLUSH_MS=340,MAX_EPC_LENGTH=100,MIN_EPC_LENGTH=6;
   // First sightings need longer protection when the reader inventories many tags.
   // Once rounds are observed, require roughly three missed cycles for removal.
   // Limit stale items: if the reader stops outputting, tags eventually expire.
@@ -97,7 +100,7 @@
     if(buffer.length>MAX_EPC_LENGTH){buffer='';return}
     event.preventDefault();
     clearTimeout(timer);
-    timer=setTimeout(flush,KEY_GAP_MS+30);
+    timer=setTimeout(flush,IDLE_FLUSH_MS);
   },true);
   setInterval(expire,250);
   window.RFIDScanner={
