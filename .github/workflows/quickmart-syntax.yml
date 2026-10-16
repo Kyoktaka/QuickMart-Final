@@ -16,8 +16,8 @@ jobs:
         run: php tests/demo-qr.php
       - name: Product description/schema contract
         run: php tests/product-description-contract.php
-      - name: Protect manager input fields from USB HID RFID keyboard bursts
-        run: node tests/rfid-input-guard.js
+      - name: Preserve manual keyboard and RFID scanning focus
+        run: node tests/manual-keyboard.js
       - name: RFID presence and scan regression tests
         run: node tests/rfid-scanner.js
       - name: Multi-tag restocking and product isolation tests

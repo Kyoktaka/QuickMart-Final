@@ -84,14 +84,15 @@
   <div class="fg"><label>Category</label><input id="epc-cat" readonly></div>
   <div class="fg"><label>Current stock</label><input id="epc-stock" readonly></div>
   <div class="fg"><label>Price</label><input id="epc-price" readonly></div>
-  <div class="fg"><label>EPC code</label><input id="epc-code" readonly placeholder="Scan or enter an EPC tag…"></div>
-  <div class="hint" id="epc-captured" aria-live="polite">No EPCs captured yet.</div>
+  <div class="fg"><label for="epc-code" class="epc-list-label">EPC codes <span id="epc-captured" aria-live="polite">0 tags</span></label>
+    <textarea id="epc-code" class="epc-multi-list" rows="6" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Scanned EPCs appear here, one per line. You can also paste or type multiple EPCs before or after scanning."></textarea>
+    <p class="epc-field-help">One EPC per line (or separated by commas). Start Scanning to collect tags; Stop Scanning to review and edit.</p>
+  </div>
   <div class="err" id="ee"></div>
   <div class="mfoot"><button class="btn ghost" data-close="m-epc">Close</button><button class="btn ghost" type="button" id="epc-clear">Clear</button><button class="btn" type="button" id="epc-arm">Start Scanning</button></div>
 </div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="../js/rfid-input-guard.js"></script>
 <script src="../js/storage.js"></script>
 <script src="../js/state.js"></script>
 <script src="../js/backend.js"></script>
