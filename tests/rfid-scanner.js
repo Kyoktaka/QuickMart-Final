@@ -111,3 +111,14 @@ assert.equal(reader.getPresentEpcs().length,0,
   'When reader stops reporting ALL tags, inferred presence eventually clears');
 reader.disable();
 console.log('20-tag inventory stability and individual removal regression tests passed');
+
+// A throttled keyboard-wedge reader must not split a real 24-character EPC.
+// Previously an 85ms key gap caused a truncated prefix to be registered.
+reader.enable();
+const slowEpc='E2827802000000000DFFD26D';
+for(const c of slowEpc){key(c);now+=145}
+key('Enter');
+assert.deepEqual(reader.getPresentEpcs(),[slowEpc],
+  'Slow multi-tag HID keystrokes must still form one COMPLETE EPC');
+reader.disable();
+console.log('Slow 24-character USB HID EPC framing regression passed');
