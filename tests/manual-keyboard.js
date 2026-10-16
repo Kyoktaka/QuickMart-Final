@@ -31,7 +31,7 @@ for(const target of [
  {id:'inv-search',tagName:'INPUT',type:'search'},
  {id:'login-user',tagName:'INPUT',type:'email'},
  {id:'p-name',tagName:'INPUT',type:'text'},
- {id:'epc-code',tagName:'TEXTAREA',readOnly:false}
+ {id:'tag-modal-input',tagName:'INPUT',type:'text'}
 ]){
  Object.assign(active,target);
  for(const c of 'James2026'){
@@ -42,7 +42,12 @@ for(const target of [
 }
 assert.equal(win.RFIDScanner.getPresentEpcs().length,0,
  'Editing fields must not register physical-keyboard typing as EPC');
-// The readonly multiline EPC field intentionally captures RFID tag bursts.
+// The EPC list is always read-only; other input fields still accept the real
+// physical keyboard without delay. Scanner capture remains possible while the
+// readonly EPC field has focus (the browser cannot distinguish USB keyboards).
+assert(/<textarea\b[^>]*id="epc-code"[^>]*\breadonly\b/.test(
+ fs.readFileSync('manager/inventory.html','utf8')),
+ 'EPC display must never be an editable textarea');
 Object.assign(active,{id:'epc-code',tagName:'TEXTAREA',readOnly:true});
 for(const c of 'E2827802000000000DFFD2EE')key(c);
 key('Enter');tick();
