@@ -20,7 +20,7 @@ for(const p of pages){
   assert(fs.existsSync(target),name+' has broken asset/navigation path: '+ref);
  }
  for(const m of html.matchAll(/<script src="([^"]+)"/g)){
-  if(!/^https?:/i.test(m[1]))assert(fs.existsSync(path.resolve(root,'manager',m[1])),name+' missing '+m[1]);
+  if(!/^https?:/i.test(m[1]))assert(fs.existsSync(path.resolve(root,'manager',m[1].split(/[?#]/)[0])),name+' missing '+m[1]);
  }
  assert(html.includes('../js/backend.js'),name+' must load the real PHP API adapter');
  if(p==='inventory.html')for(const id of ['epc-product','epc-arm','epc-clear','epc-captured'])
