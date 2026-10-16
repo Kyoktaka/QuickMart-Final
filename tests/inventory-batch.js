@@ -89,6 +89,25 @@ async function run(){
   await arm.onclick();
   assert.equal(reader.enabled,false,'Invalid manual EPC may not start capture');
   assert.match(element('#ee').textContent,/Invalid EPC format/);
+  // Explicit full 20-tag live capture: all should appear in ONE scrolling box.
+  element('#btn-epc-mode').onclick();
+  await arm.onclick();
+  const twenty=Array.from({length:20},(_,n)=>'EPC-'+String(n+1).padStart(3,'0'));
+  twenty.forEach(read);read(twenty[0]);read(twenty[19]);
+  assert.equal(element('#epc-code').value.split('\n').length,20);
+  assert.equal(element('#epc-captured').textContent,'20 tags');
+  await arm.onclick();await arm.onclick();
+  assert.equal(batches[3].epcs.length,20);
+  // Cancelling discard of manually pasted EPCs restores the previous product.
+  element('#btn-epc-mode').onclick();
+  const initialProduct=String(element('#epc-product').value);
+  element('#epc-code').value='EPC-KEEP';
+  element('#epc-code').listeners.input();
+  sandbox.confirm=()=>false; // The closure sees sandbox.confirm at runtime.
+  product.value=initialProduct==='1'?'2':'1';
+  product.onchange();
+  assert.equal(String(product.value),initialProduct);
+  assert.equal(element('#epc-code').value,'EPC-KEEP');
   console.log('Multi-line EPC scan, manual typing, deduplication, batch restock and product isolation passed');
 }
 run().catch(e=>{console.error(e);process.exitCode=1});
