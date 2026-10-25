@@ -13,12 +13,15 @@
    While RFIDScanner is enabled and not blocked, this guard stands aside on its capture surface;
    editable fields remain guarded. A paired, connected raw bridge leaves all physical typing alone. */
 (function(){
+  if(globalThis.QuickMartInputGuard)return;
   // KEY_GAP_MS: reader-speed detector. BURST_HOLD_GAP_MS: while a burst runs, a key slower than this is a person
   // (so ordinary slower typing resumes even if the reader keeps reading, e.g. a tag lying on the antenna).
-  const KEY_GAP_MS=50,BURST_HOLD_GAP_MS=90,BURST_KEYS=12,BURST_END_MS=400,ENTER_AFTER_MS=500;
+  const KEY_GAP_MS=85,CANDIDATE_GAP_MS=240,BURST_HOLD_GAP_MS=340,BURST_KEYS=12,BURST_END_MS=400,ENTER_AFTER_MS=500;
   const SCAN_CHAR=/^[A-Fa-f0-9]$/;
   const NOT_TEXT=new Set(['button','checkbox','radio','submit','reset','file','image','range','color','hidden']);
   let last=0,fast=0,burst=false,timer=null,deadline=0,before='',beforeEl=null,selStart=0,selEnd=0,lastScanKey=-Infinity;
+  let candidateAt=0,closingEnter=false;
+  const insertionSnapshots=new WeakMap();
   const readerOpen=el=>{const r=globalThis.RFIDScanner;
     if(!r)return false;
     const raw=r.getBridgeHealth?.();
@@ -66,8 +69,8 @@
   // the verified reader-shaped frames without buffering ordinary prose.
   // Keyboard-wedge input is still indistinguishable from identical fast human
   // input; other EPC prefixes/slow protocols rely on the conservative fallback.
-  const EPC_FRAME_GAP_MS=90,EPC_FRAME_MIN_KEYS=20,EPC_FRAME_END_MS=600;
-  let epcPending=null,epcPendingTimer=null,epcPendingDeadline=0,epcDropping=false,epcDropAt=0;
+  const EPC_FRAME_GAP_MS=90,EPC_FRAME_MIN_KEYS=BURST_KEYS,EPC_FRAME_END_MS=600;
+  let epcPending=null,epcPendingTimer=null,epcPendingDeadline=0,epcDropping=false,epcDropAt=0,epcDropEl=null;
   const writable=el=>Boolean(el&&['INPUT','TEXTAREA'].includes(el.tagName)&&
     !el.disabled&&!el.readOnly&&isField(el));
   function replayPending(){
@@ -75,6 +78,11 @@
     if(!p||!writable(p.el))return;
     const el=p.el,old=String(el.value??'');
     const start=Math.min(p.start,old.length),end=Math.min(Math.max(start,p.end),old.length);
+    // If a USB pause expires the prefix buffer, the fallback must still know
+    // the value before that prefix. Otherwise its later rollback leaves the
+    // replayed first 1-3 reader characters behind.
+    // Prefix keys already advance the shared candidate while held. Replaying
+    // them must not reset that candidate or its original rollback baseline.
     try{
       if(typeof el.setRangeText==='function')el.setRangeText(p.chars,start,end,'end');
       else{
@@ -101,16 +109,30 @@
     clearTimeout(epcPendingTimer);epcPendingTimer=null;
     replayPending();
   }
+  function discardPending(){
+    epcPending=null;clearTimeout(epcPendingTimer);epcPendingTimer=null;
+  }
+  function recognizePending(now){
+    if(fast<EPC_FRAME_MIN_KEYS)return;
+    const el=epcPending.el;
+    discardPending();epcDropping=true;epcDropAt=now;epcDropEl=el;
+    rollback(el);
+  }
   document.addEventListener('keydown',e=>{
+    // Uppercase HID letters may press/release Shift around each letter. Shift
+    // is part of the reader frame, not a reason to replay or release it.
+    if(e.key==='Shift')return;
     const now=Date.now(),el=e.target,key=e.key,hex=typeof key==='string'&&SCAN_CHAR.test(key);
-    if(readerOpen(el)||e.ctrlKey||e.metaKey||e.altKey||e.repeat||e.isComposing){
+    if(readerOpen(el)||e.ctrlKey||e.metaKey||e.altKey||e.repeat||e.isComposing||e.keyCode===229){
       flushPending();epcDropping=false;return;
     }
+    if(burst)return;
+    if(epcDropping&&el!==epcDropEl)epcDropping=false;
     if(epcDropping){
-      if((hex&&now-epcDropAt<=EPC_FRAME_GAP_MS)||
+      if((hex&&now-epcDropAt<=BURST_HOLD_GAP_MS)||
          (key==='Enter'&&now-epcDropAt<=EPC_FRAME_END_MS)){
         epcDropAt=now;swallow(e);
-        if(key==='Enter')epcDropping=false;
+        if(key==='Enter'){epcDropping=false;endBurst(false);closingEnter=true}
         return;
       }
       epcDropping=false;
@@ -119,42 +141,99 @@
       flushPending();
     }
     if(epcPending&&hex){
+      trackCandidate(el,now,now-last);last=now;
       epcPending.chars+=key;epcPending.at=now;
       swallow(e);armPending(now);
-      if(epcPending.chars.length>=EPC_FRAME_MIN_KEYS){
-        epcPending=null;
-        clearTimeout(epcPendingTimer);epcPendingTimer=null;
-        epcDropping=true;epcDropAt=now;
-      }
+      recognizePending(now);
       return;
     }
     // Deliberately narrow start-of-frame candidates: E2xx... and 30xx...
     // They cover the confirmed reader EPC and the original QuickMart sample
     // EPCs while keeping typical ordinary typing immediate.
     if(writable(el)&&(key==='E'||key==='3')){
+      trackCandidate(el,now,now-last);last=now;
       let start=String(el.value??'').length,end=start;
       try{
         if(typeof el.selectionStart==='number')start=el.selectionStart;
         if(typeof el.selectionEnd==='number')end=el.selectionEnd;
       }catch(_){}
       epcPending={el,chars:key,start,end,at:now};
-      swallow(e);armPending(now);
+      swallow(e);armPending(now);recognizePending(now);
     }
   },true);
 
+  function resetCandidate(el,now){
+    fast=1;candidateAt=now;remember(el);
+  }
+  function trackCandidate(el,now,gap){
+    if(el!==beforeEl||gap>CANDIDATE_GAP_MS||!fast||now-candidateAt>BURST_HOLD_GAP_MS*BURST_KEYS){
+      resetCandidate(el,now);snapshot(el);return;
+    }
+    // Preserve the original prefix through short USB pauses, even before the
+    // first two keys establish a fast run. Previously a pause
+    // reset the rollback baseline to include scanner characters already inserted.
+    // normal typing speed: slower keys do not increase the fast-key count.
+    if(gap<KEY_GAP_MS)fast++;
+  }
+  function isBulkFrame(text){
+    return typeof text==='string'&&/^(?:EPC[:=\s]+)?[A-Fa-f0-9]{6,100}[\r\n]*$/.test(text);
+  }
+  function snapshot(el){
+    if(!isField(el)||!('value' in el))return;
+    const value=String(el.value);
+    insertionSnapshots.set(el,{value,start:typeof el.selectionStart==='number'?el.selectionStart:value.length,
+      end:typeof el.selectionEnd==='number'?el.selectionEnd:value.length});
+  }
+  // A keyboard-wedge frame may arrive as one browser text insertion rather than
+  // one keydown per character. Guard that path before page input handlers run.
+  document.addEventListener('beforeinput',e=>{
+    if(readerOpen(e.target)||e.isComposing||!isField(e.target))return;
+    snapshot(e.target);
+    if(e.inputType==='insertText'&&isBulkFrame(e.data)){
+      if(epcPending?.el===e.target)discardPending();
+      lastScanKey=Date.now();beforeEl=e.target;burst=true;swallow(e);armEnd(lastScanKey);
+    }
+  },true);
+  document.addEventListener('input',e=>{
+    const el=e.target;
+    if(readerOpen(el)||e.isComposing||!isField(el)||!('value' in el))return;
+    if(e.inputType==='insertText'&&isBulkFrame(e.data)){
+      if(epcPending?.el===el)discardPending();
+      const previous=insertionSnapshots.get(el),value=String(el.value),data=String(e.data);
+      if(previous&&value===previous.value.slice(0,previous.start)+data+previous.value.slice(previous.end)){
+        el.value=previous.value;
+        try{el.setSelectionRange(previous.start,previous.end)}catch(_){}
+      }else{
+        const end=typeof el.selectionStart==='number'?el.selectionStart:value.length,start=end-data.length;
+        if(start>=0&&value.slice(start,end)===data){
+          el.value=value.slice(0,start)+value.slice(end);
+          try{el.setSelectionRange(start,start)}catch(_){}
+        }
+      }
+      lastScanKey=Date.now();beforeEl=el;burst=true;armEnd(lastScanKey);
+      e.stopPropagation?.();e.stopImmediatePropagation?.();
+    }
+    snapshot(el);
+  },true);
+  document.addEventListener('focusin',e=>{snapshot(e.target)},true);
   document.addEventListener('keydown',e=>{
+    if(e.key==='Shift')return;
     if(e.defaultPrevented)return;
-    if(readerOpen(e.target)||e.ctrlKey||e.metaKey||e.altKey||e.repeat){
+    if(readerOpen(e.target)||e.ctrlKey||e.metaKey||e.altKey||e.repeat||e.isComposing||e.keyCode===229){
       if(burst||fast)endBurst(false);lastScanKey=-Infinity;return;
     }
     const key=e.key,enter=key==='Enter',printable=typeof key==='string'&&key.length===1;
-    if(!enter&&!printable){endBurst(false);lastScanKey=-Infinity;return}
+    if(!enter&&!printable){endBurst(false);lastScanKey=-Infinity;snapshot(e.target);return}
     const el=e.target,field=isField(el),now=Date.now(),gap=now-last;last=now;
     if(burst&&el!==beforeEl){endBurst(false);lastScanKey=-Infinity}
     if(burst){
       // Reader still typing + its closing Enter: swallow. A slower key is a person: end the burst, let it through.
       if((SCAN_CHAR.test(key)&&gap<=BURST_HOLD_GAP_MS)||(enter&&now-lastScanKey<=ENTER_AFTER_MS)){
-        lastScanKey=now;swallow(e);armEnd(now);return;
+        lastScanKey=now;swallow(e);
+        // Enter completes the frame. Do not hold the following person's hex
+        // keys for another frame-pause interval after the reader has finished.
+        if(enter){endBurst(false);closingEnter=true}else armEnd(now);
+        return;
       }
       endBurst(false);
     }
@@ -171,10 +250,17 @@
     // letters also occur in normal typing, so they must never trigger a rollback.
     // Rich contenteditable fields are not rewritten by this plain-input fallback.
     if(el?.isContentEditable){fast=0;return}
-    if(el!==beforeEl||gap>=KEY_GAP_MS||!fast){fast=1;remember(el);return}   // normal typing speed
-    if(++fast>=BURST_KEYS){burst=true;lastScanKey=now;swallow(e);rollback(el);armEnd(now)}
+    trackCandidate(el,now,gap);
+    if(fast>=BURST_KEYS){burst=true;lastScanKey=now;swallow(e);rollback(el);armEnd(now)}
   },true);
   ['keypress','keyup'].forEach(type=>document.addEventListener(type,e=>{
-    if(burst&&!readerOpen(e.target))swallow(e);
+    if((burst||(closingEnter&&e.key==='Enter'))&&!readerOpen(e.target))swallow(e);
+    if(type==='keyup'&&e.key==='Enter')closingEnter=false;
   },true));
+  globalThis.QuickMartInputGuard={
+    // Timing fallback, not physical-device authentication. A verified raw bridge
+    // or reader-delimited protocol is still required for absolute separation.
+    isDiscarding:el=>Boolean((burst&&el===beforeEl&&Date.now()-lastScanKey<=BURST_END_MS)||
+      (epcDropping&&el===epcDropEl&&Date.now()-epcDropAt<=EPC_FRAME_END_MS))
+  };
 })();
