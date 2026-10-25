@@ -362,19 +362,26 @@ function openRemoveModal(productId){
   drawRemoveCount();document.activeElement?.blur?.();openHold('m-remove');
 }
 function closeRemoveModal(){removeTarget=null;closeHold('m-remove')}
-// Removes `count` units of a product. The removed tags are blocked until they leave the reader.
+// Removes `count` units of a product. The tag is un-latched immediately so it
+// can be re-scanned right away if the customer changed their mind. Physically
+// lifting the tag off the reader is only necessary if they don't want it.
 function removeFromCart(productId,count){
   const item=state.cart.find(i=>i.id===productId);if(!item)return false;
   const n=Math.max(1,Math.min(Math.floor(Number(count))||1,item.scanned.length));
   const gone=item.scanned.slice(item.scanned.length-n);
-  for(const epc of gone){latchedEpcs.delete(epc);if(!absentEpcs.has(epc))removedEpcs.set(epc,null)}
+  // Un-latch only — do NOT add to removedEpcs. The next tray event re-absorbs
+  // any tag still on the reader, so the customer can immediately re-scan.
+  // A truly unwanted item must be lifted off the reader to stay out of the cart.
+  for(const epc of gone){latchedEpcs.delete(epc);removedEpcs.delete(epc)}
   item.scanned=item.scanned.slice(0,item.scanned.length-n);item.qty=item.scanned.length;
   if(!item.qty)state.cart=state.cart.filter(i=>i!==item);
   renderCart();
   if(!state.cart.length)screen('k-idle');
   void saveCart();
   scheduleLookup();   // re-verify what is left (and anything still waiting to join)
-  toast('Removed '+(n>1?n+' × ':'')+item.name+'. Take it off the reader.');
+  // Tag still on reader? Next tray sweep re-adds it automatically.
+  const stillPresent=gone.some(epc=>!absentEpcs.has(normEpc(epc)));
+  toast('Removed '+(n>1?n+' × ':'')+item.name+'.'+(stillPresent?' Scan again to re-add, or lift it off to keep it removed.':''));
   return true;
 }
 $('#cart-body').addEventListener('click',e=>{
