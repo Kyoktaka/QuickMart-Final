@@ -6,4 +6,4 @@ define('MAIL_PORT', (int) (getenv('QUICKMART_SMTP_PORT') ?: 587));
 define('MAIL_USERNAME', getenv('QUICKMART_SMTP_USERNAME') ?: 'managerquickmart@gmail.com');
 define('MAIL_PASSWORD', getenv('QUICKMART_SMTP_PASSWORD') ?: 'lagblcabdfulccuu');
 define('MAIL_FROM_NAME', 'QuickMart');
-define('APP_BASE_URL', getenv('QUICKMART_APP_BASE_URL') ?: 'http://localhost/QuickMart');
+define('APP_BASE_URL', getenv('QUICKMART_APP_BASE_URL') ?: 'http://localhost/QuickMart-Final');
