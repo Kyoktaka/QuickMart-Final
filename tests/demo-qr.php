@@ -5,6 +5,9 @@ require_once __DIR__ . '/../includes/demo-qr.php';
 $cases = [
     'QMPAY|QM-WALLET-1001|C899' => 'success',
     'QMPAY|QM-WALLET-1002|C900' => 'insufficient_balance',
+    'QUICKMART-DEMO|PAYMENT_SUCCESS|OFFLINE-V1' => 'success',
+    'QUICKMART-DEMO|NO_BALANCE|OFFLINE-V1' => 'insufficient_balance',
+    'QUICKMART-DEMO|NO_INTERNET|OFFLINE-V1' => 'no_internet',
     'QMPAY|QM-WALLET-1001|C900' => 'invalid',
     'QMPAY|QM-WALLET-1002|C899' => 'invalid',
     'QMPAY|DEMO|C293' => 'invalid',
@@ -23,7 +26,7 @@ if (quickmart_demo_qr_outcome('  QMPAY|QM-WALLET-1001|C899  ') !== 'success') {
     fwrite(STDERR, 'Whitespace normalization failed.' . PHP_EOL);
     exit(1);
 }
-echo '9 fixed demo QR test cases passed.' . PHP_EOL;
+echo (count($cases) + 1) . ' fixed demo QR test cases passed.' . PHP_EOL;
 
 $hostCases = [
     ['127.0.0.1','localhost',false,false,true],

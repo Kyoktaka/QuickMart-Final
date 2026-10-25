@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../config/bootstrap.php';
 require_once __DIR__ . '/../../config/database.php';
 
 require_manager();
+session_write_close(); // read-only: free the session lock
 
 try {
     // Successful payments contribute to revenue; unsuccessful attempts do not.

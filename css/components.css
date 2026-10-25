@@ -52,3 +52,10 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 .pop.right{left:auto;right:0}
 .pop.show{display:flex;animation:fadeInUp .2s ease}
 .pop label{font-size:11px;color:var(--mute);font-weight:700;display:flex;flex-direction:column;gap:4px}
+
+/* pagination (history + inventory) */
+.pg{display:flex;gap:4px;align-items:center}
+.pg button{color:var(--primary-orange);background:none;border:0;font-weight:700;font-size:13px;width:28px;height:28px;border-radius:6px;transition:var(--transition)}
+.pg button:hover:not(:disabled){background:#FFE8D9;transform:translateY(-2px)}
+.pg button.cur{background:#FFE8D9}
+.pg button:disabled{opacity:.35;cursor:default}

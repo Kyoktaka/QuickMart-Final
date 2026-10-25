@@ -122,3 +122,23 @@ assert.deepEqual([...reader.getPresentEpcs()],[slowEpc],
   'Slow multi-tag HID keystrokes must still form one COMPLETE EPC');
 reader.disable();
 console.log('Slow 24-character USB HID EPC framing regression passed');
+
+// Popup pauses do not count as evidence that the physical tag left. Genuine
+// adaptive expiry emits absence once; disabling never emits an absence event.
+reader.enable();scan(a);
+const absenceBefore=events.filter(e=>e.type==='rfid:absent').length;
+now+=1000;reader.setBlocked(true);
+now+=60000;intervalFn();
+assert.deepEqual([...reader.getPresentEpcs()],[a],'Popup must freeze presence expiry');
+assert.equal(events.filter(e=>e.type==='rfid:absent').length,absenceBefore);
+reader.setBlocked(false);now+=4500;intervalFn();
+assert.deepEqual([...reader.getPresentEpcs()],[a],'Popup duration must not consume absence tolerance');
+now+=1000;intervalFn();
+assert.deepEqual([...reader.getPresentEpcs()],[]);
+const expired=events.filter(e=>e.type==='rfid:absent');
+assert.equal(expired.length,absenceBefore+1);assert.equal(expired.at(-1).detail.epc,a);
+intervalFn();assert.equal(events.filter(e=>e.type==='rfid:absent').length,expired.length);
+scan(b);reader.disable();
+assert.equal(events.filter(e=>e.type==='rfid:absent').length,expired.length,
+ 'A UI disable/clear must never rearm a manually removed EPC');
+console.log('Blocked presence pause and genuine-absence event regressions passed');

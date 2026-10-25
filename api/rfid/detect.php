@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../config/bootstrap.php';
 
 require_scan_authorized();
+session_write_close(); // read-only lookup: do not hold the session lock while the database works
 require_post();
 
 $data = read_json_body();

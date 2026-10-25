@@ -82,6 +82,8 @@ try {
         ], 404);
     }
 
+    $category = canonical_category($conn, $category, (int) $productId);
+
     $stmt = $conn->prepare("
         UPDATE PRODUCTtbl
         SET product_name = :product_name,

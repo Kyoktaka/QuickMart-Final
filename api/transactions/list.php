@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../config/bootstrap.php';
 require_once __DIR__ . '/../../config/database.php';
 require_manager();
+session_write_close(); // read-only: free the session lock
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     header('Allow: GET');
@@ -47,6 +48,7 @@ try {
         $successful = $row['status'] === 'SUCCESSFUL';
         $transactions[] = [
             'id' => (string) $row['session_id'],
+            'seq' => (int) $row['purchase_id'],
             'date' => str_replace(' ', 'T', (string) $row['purchase_date']),
             'items' => $successful ? (int) $row['purchased_items'] : (int) $row['attempted_items'],
             'amount' => (float) $row['total_amount'],

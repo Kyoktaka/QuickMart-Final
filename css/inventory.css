@@ -31,7 +31,6 @@
 .btn-filter.has-filter .dot{display:inline-block;animation:pulseGlow 2s infinite}
 
 .inv-card{background:#fff;border:1px solid #e2e8e3;border-radius:14px;box-shadow:0 3px 14px rgba(24,49,42,.045);padding:0;overflow:auto;animation:fadeInUp .5s ease}
-.inv-scroll{max-height:430px;overflow:auto;overscroll-behavior:contain}
 .inv-table{min-width:760px;border:0;border-radius:0;font-size:.85rem}
 .inv-table th{position:sticky;top:0;z-index:2;background:#f4f7f4;color:#526157;border-bottom:1px solid #e1e8e2;text-transform:uppercase;letter-spacing:.045em;font-size:.73rem;font-weight:800;padding:15px 13px;white-space:nowrap}
 .inv-table td{padding:13px;height:64px;font-weight:500;font-size:.84rem;border-top:1px solid #edf1ed}
@@ -70,3 +69,15 @@
 #m-epc .epc-multi-list:focus{outline:2px solid rgba(255,107,0,.35);outline-offset:1px;border-color:var(--primary-orange)}
 #m-epc .epc-multi-list[readonly]{background:#f7faf7;cursor:default}
 #m-epc .epc-field-help{font-size:12px;line-height:1.4;color:#718078;margin:6px 0 0}
+
+/* Scanned EPC rows with a Remove button for a wrong tag. */
+#m-epc .epc-list{display:block;min-height:136px;max-height:220px;overflow:auto;padding:6px;border:1px solid #ced8d0;border-radius:9px;background:#f7faf7}
+#m-epc .epc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border-radius:7px}
+#m-epc .epc-row+.epc-row{border-top:1px solid #e4ebe5}
+#m-epc .epc-row:hover{background:#fff}
+#m-epc .epc-row code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;color:#19352b;word-break:break-all}
+#m-epc .epc-del{display:inline-flex;align-items:center;gap:5px;flex:none;border:1px solid #f1c9b0;background:#fff;color:#c2530a;border-radius:7px;padding:4px 9px;font-weight:600;font-size:12px;line-height:1;font-family:inherit;cursor:pointer}
+#m-epc .epc-del svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#m-epc .epc-del:hover:not(:disabled){background:#fff3ea;border-color:var(--primary-orange)}
+#m-epc .epc-del:disabled{opacity:.5;cursor:default}
+#m-epc .epc-empty{padding:14px 10px;font-size:12px;color:#718078}

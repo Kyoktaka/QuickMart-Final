@@ -24,12 +24,55 @@ async function ensureQrLib(){
     if(await loadScript(src)&&typeof Html5Qrcode!=='undefined')return true;
   return false;
 }
+async function startNativeQrScanner(tok,status,giveUp){
+  if(!('BarcodeDetector' in window)||!navigator.mediaDevices?.getUserMedia)return false;
+  let detector;
+  try{detector=new BarcodeDetector({formats:['qr_code']})}catch(e){return false}
+  let stream,raf=0,video;
+  try{
+    try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false})}
+    catch(e){stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false})}
+    if(tok!==scanTok){stream.getTracks().forEach(t=>t.stop());return true}
+    const host=$('#qr-reader');host.innerHTML='';
+    video=document.createElement('video');video.autoplay=true;video.muted=true;video.playsInline=true;
+    video.style.cssText='width:100%;height:100%;object-fit:cover';
+    host.appendChild(video);video.srcObject=stream;await video.play();
+    let detecting=false;
+    const nativeScanner={
+      async stop(){cancelAnimationFrame(raf);stream?.getTracks().forEach(t=>t.stop());},
+      clear(){if(video){video.pause();video.srcObject=null}host.innerHTML=''}
+    };
+    // Assign before starting the animation loop so the stop guard is reliable.
+    state.scanner=nativeScanner;state.scanning=true;
+    const nativeScannerRef=nativeScanner;
+    const scanNative=async()=>{
+      if(tok!==scanTok||state.scanner!==nativeScannerRef)return;
+      if(!detecting&&video.readyState>=2){
+        detecting=true;
+        try{const codes=await detector.detect(video);if(codes.length&&tok===scanTok)await onQrDecoded(codes[0].rawValue)}
+        catch(e){}
+        finally{detecting=false}
+      }
+      if(tok===scanTok&&state.scanner===nativeScannerRef)raf=requestAnimationFrame(scanNative);
+    };
+    raf=requestAnimationFrame(scanNative);
+    $('#btn-cancel-scan').style.display='';status.textContent='Point the QR code at the camera…';
+    return true;
+  }catch(err){
+    if(stream)stream.getTracks().forEach(t=>t.stop());
+    console.warn('Native QR scanner unavailable:',err);
+    return false;
+  }
+}
 async function startCameraScanner(){
   await stopCameraScanner();
   const tok=++scanTok,status=$('#qr-status');
   status.textContent='Starting camera…';status.className='qr-status';
   const giveUp=msg=>{if(tok!==scanTok)return;status.textContent=msg;status.className='qr-status bad';$('#btn-cam-retry').style.display=''};
-  if(!(await ensureQrLib()))return giveUp('The camera library could not load. Check the internet connection or an ad blocker, then press “Try camera again”.');
+  if(!(await ensureQrLib())){
+    if(await startNativeQrScanner(tok,status,giveUp))return;
+    return giveUp('The QR scanner library is unavailable and this browser does not support its offline scanner. Use an up-to-date Chrome browser, allow camera access, and open QuickMart on localhost.');
+  }
   let lastErr;
   for(const attempt of [{facingMode:'environment'},{facingMode:'user'},'first-camera']){
     if(tok!==scanTok)return;

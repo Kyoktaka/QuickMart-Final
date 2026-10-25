@@ -51,6 +51,8 @@ if (strlen($category) > 100) {
 }
 
 try {
+    $category = canonical_category($conn, $category);
+
     $stmt = $conn->prepare("
         INSERT INTO PRODUCTtbl (product_name, description, unit_price, category)
         VALUES (:product_name, :description, :unit_price, :category)

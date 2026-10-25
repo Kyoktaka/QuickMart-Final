@@ -1,0 +1,9 @@
+{
+  "vid": null,
+  "pid": null,
+  "interface": null,
+  "serial": null,
+  "confirm_reader_interface": false,
+  "port": 5757,
+  "allowed_origins": ["http://localhost"]
+}

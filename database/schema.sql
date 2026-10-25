@@ -1,3 +1,5 @@
+-- Fresh installations only. CREATE DATABASE intentionally fails if it already exists.
+-- Existing installations: use tools/database-upgrade.php after stopping application access.
 CREATE DATABASE rfid_checkout_main
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
@@ -17,19 +19,19 @@ CREATE TABLE PRODUCTtbl (
     INDEX idx_product_name (product_name),
     INDEX idx_product_category (category),
     INDEX idx_product_status (status)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO PRODUCTtbl (product_name, description, unit_price, category) VALUES
-('Zonrox Color Safe Bleach', 'Blossom Fresh Scent (225 ml)', 30.00, 'Home Essentials'),
-('Nissin Cup Noodles', 'Seafood Flavor (40g)', 25.00, 'Food & Snacks'),
+('Alcohol Dispenser', 'Compact and Refillable (20g)', 30.00, 'Home Essentials'),
+('Focus Refillable Fillers', 'Lighweight Pulp Paper (55gsm)', 25.00, 'Home Essentials'),
 ('Rice Scooper', 'Recyclable Plastic Material (18g)', 32.00, 'Home Essentials'),
-('Oishi Potato Fries', 'Plain Flavor (50g)', 16.00, 'Food & Snacks'),
+('Lasap Iodized Salt', 'Premium Quality (100g)', 16.00, 'Food & Snacks'),
 ('Sleek Stockings', 'Soft and Breathable (1 pair)', 60.00, 'Clothing'),
 ('Colgate Toothbrush', 'Recyclable Plastic Material', 20.00, 'Home Essentials'),
 ('Dumpling Squishy', 'Fun and Relaxing (160g)', 67.00, 'Toys'),
 ('Lablast Detergent Bar', 'Floral Scent (130g)', 12.00, 'Home Essentials'),
 ('Pocky Snack Box', 'Chocolate Flavor (40g)', 35.00, 'Food & Snacks'),
-('Argentina Giniling', 'Ground Pork Mix (250g)', 69.00, 'Food & Snacks');
+('Urban Tee Shirt', 'Breathable Blue (F-Medium)', 100.00, 'Clothing');
 
 
 CREATE TABLE RFID_tags (
@@ -52,7 +54,7 @@ CREATE TABLE RFID_tags (
         REFERENCES PRODUCTtbl(product_id)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 CREATE TABLE ADMINtbl (
@@ -66,7 +68,7 @@ CREATE TABLE ADMINtbl (
         ON UPDATE CURRENT_TIMESTAMP,
 
     PRIMARY KEY (admin_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 CREATE TABLE PASSWORD_RESET_tokens (
@@ -87,13 +89,13 @@ CREATE TABLE PASSWORD_RESET_tokens (
         REFERENCES ADMINtbl(admin_id)
         ON UPDATE CASCADE
         ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 CREATE TABLE PURCHASEtbl (
     purchase_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     admin_id INT UNSIGNED NOT NULL,
-    session_id VARCHAR(50) NOT NULL UNIQUE,
+    session_id VARCHAR(50) NOT NULL,
     attempt_status ENUM('failed','cancelled') NULL DEFAULT NULL,
     attempted_items INT UNSIGNED NOT NULL DEFAULT 0,
     status ENUM('SUCCESSFUL','UNSUCCESSFUL')
@@ -111,7 +113,7 @@ CREATE TABLE PURCHASEtbl (
         REFERENCES ADMINtbl(admin_id)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 CREATE TABLE PURCHASE_items (
@@ -143,4 +145,42 @@ CREATE TABLE PURCHASE_items (
         REFERENCES RFID_tags(tag_id)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- PHP/MySQL owns recoverable carts, confirmation, deadlines and payment attempts.
+CREATE TABLE CHECKOUT_sessions (
+    session_id VARCHAR(50) NOT NULL,
+    admin_id INT UNSIGNED NOT NULL,
+    owner_hash CHAR(64) NOT NULL,
+    status ENUM('CART','REVIEWED','PAYMENT','SUCCESSFUL','VOIDED') NOT NULL DEFAULT 'CART',
+    epcs_json LONGTEXT NOT NULL,
+    cart_json LONGTEXT NOT NULL,
+    revision INT UNSIGNED NOT NULL DEFAULT 1,
+    total_items INT UNSIGNED NOT NULL DEFAULT 0,
+    total_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    failed_attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    deadline_at DATETIME NULL DEFAULT NULL,
+    reason VARCHAR(255) NULL DEFAULT NULL,
+    purchase_id INT UNSIGNED NULL DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (session_id),
+    INDEX idx_checkout_owner_status (admin_id, owner_hash, status),
+    CONSTRAINT fk_checkout_admin FOREIGN KEY (admin_id)
+        REFERENCES ADMINtbl(admin_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_checkout_purchase FOREIGN KEY (purchase_id)
+        REFERENCES PURCHASEtbl(purchase_id) ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE CHECKOUT_attempts (
+    session_id VARCHAR(50) NOT NULL,
+    attempt_id VARCHAR(64) NOT NULL,
+    outcome VARCHAR(40) NOT NULL,
+    response_json LONGTEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (session_id, attempt_id),
+    CONSTRAINT fk_checkout_attempt_session FOREIGN KEY (session_id)
+        REFERENCES CHECKOUT_sessions(session_id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

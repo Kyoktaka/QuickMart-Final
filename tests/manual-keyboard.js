@@ -1,5 +1,7 @@
-// Regression: real physical keyboard input is never buffered by a global
-// RFID keyboard-wedge guard. Scan capture is limited to designated RFID pages.
+// Regression: ordinary physical keyboard input is not buffered by the scanner
+// itself. The old global rfid-input-guard must not return. A separate conservative
+// password guard is covered together with scanning in scanner-input-integration.js.
+// Scan capture remains limited to designated RFID pages and their capture surface.
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 for(const page of ['login','dashboard','inventory','history','scan','kiosk']){
@@ -45,9 +47,12 @@ assert.equal(win.RFIDScanner.getPresentEpcs().length,0,
 // The EPC list is always read-only; other input fields still accept the real
 // physical keyboard without delay. Scanner capture remains possible while the
 // readonly EPC field has focus (the browser cannot distinguish USB keyboards).
-assert(/<textarea\b[^>]*id="epc-code"[^>]*\breadonly\b/.test(
- fs.readFileSync('manager/inventory.html','utf8')),
- 'EPC display must never be an editable textarea');
+const inventoryHtml=fs.readFileSync('manager/inventory.html','utf8');
+assert(/<textarea\b[^>]*id="epc-code"[^>]*\breadonly\b/.test(inventoryHtml)||
+ /<div\b[^>]*id="epc-list"/.test(inventoryHtml),
+ 'EPC display must be a read-only textarea or a non-editable list');
+assert(!/<(?:input|textarea)\b[^>]*id="epc-list"/.test(inventoryHtml),
+ 'The current scanner-only EPC list must never become a free-text editor');
 Object.assign(active,{id:'epc-code',tagName:'TEXTAREA',readOnly:true});
 for(const c of 'E2827802000000000DFFD2EE')key(c);
 key('Enter');tick();
