@@ -21,7 +21,7 @@ const MAX_LOOKUP_RETRIES=3,LOOKUP_RETRY_MS=2500;
 // within a few milliseconds. Timing cannot identify the USB device: long fast
 // hexadecimal human input remains ambiguous, and slow/non-hex reader output can
 // escape this fallback. Verified raw bridge mode leaves physical typing alone.
-const SCANNER_KEY_GAP_MS=50,SCANNER_BURST_KEYS=12,SCANNER_BURST_END_MS=400,SCANNER_HOLD_GAP_MS=90;
+const SCANNER_KEY_GAP_MS=85,SCANNER_BURST_KEYS=12,SCANNER_BURST_END_MS=400,SCANNER_HOLD_GAP_MS=340;
 const SCANNER_HEX_KEY=/^[A-Fa-f0-9]$/;
 const HOLD_MODALS=['m-tag','m-confirm','m-remove'];
 const TRASH_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>';
@@ -432,6 +432,17 @@ function armBurstEnd(){
   },SCANNER_BURST_END_MS);
 }
 $('#tag-modal-input').addEventListener('keydown',e=>{
+  if(e.key==='Shift')return;
+  // The application-wide capture guard owns scanner filtering on real pages;
+  // do not run a second independent detector with a different rollback baseline.
+  if(globalThis.QuickMartInputGuard){
+    if(e.key==='Enter'){
+      const accept=!e.defaultPrevented&&!QuickMartInputGuard.isDiscarding($('#tag-modal-input'));
+      e.preventDefault();
+      if(accept)void submitTagModal();
+    }
+    return;
+  }
   if(e.ctrlKey||e.metaKey||e.altKey||e.repeat){resetTagTypingGuard();return}
   const enter=e.key==='Enter',printable=typeof e.key==='string'&&e.key.length===1;
   const raw=RFIDScanner.getBridgeHealth?.();

@@ -233,6 +233,14 @@ async function main(){
   assert.equal(field.value,'','Rejected scanner input is silently removed from the manual field');
   const calls=requests.length;await advance(300);
   assert.equal(requests.length,calls,'Scanner burst must not be looked up');
+  await advance(500);field.value='';
+  for(const c of actualEpc){
+    if(/[A-F]/.test(c))press('Shift',2);
+    press(c,4);
+  }
+  press('Enter',4);
+  assert.equal(field.value,'','Standalone Input Tag fallback must keep uppercase Shift transitions inside the rejected reader frame');
+  assert.equal(requests.length,calls,'Reader Shift transitions cannot cause a manual lookup');
   // a person typing at a normal pace is untouched, including a fast typist (~90 ms/char)
   await advance(600);
   field.value='';
