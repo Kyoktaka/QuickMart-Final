@@ -28,7 +28,7 @@
     if(/^(?:Digit[0-9]|Key[A-F])$/.test(e.code||''))return e.code.slice(-1);
     return SCAN_CHAR.test(e.key)?e.key.toUpperCase():'';
   };
-  const NOT_TEXT=new Set(['button','checkbox','radio','submit','reset','file','image','range','color','hidden']);
+  const NOT_TEXT=new Set(['button','checkbox','radio','submit','reset','file','image','range','color','hidden','password']);
   let last=0,fast=0,burst=false,timer=null,deadline=0,before='',beforeEl=null,selStart=0,selEnd=0,lastScanKey=-Infinity;
   let candidateAt=0,candidatePrefix='',closingEnter=false,closingEnterAt=0;
   const insertionSnapshots=new WeakMap();
