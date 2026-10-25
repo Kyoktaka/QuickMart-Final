@@ -6,7 +6,9 @@
      and the reader's closing Enter is swallowed (cannot submit the form or use a password attempt)
    - nothing focused / a button focused (Logout, Cancel, ...): recognized reader characters and its closing Enter
      are swallowed, so a recognized burst cannot click a button; slow or unsupported frames remain ambiguous
-   Paste, Backspace, Tab and Space are never intercepted. Ordinary typing is passed through immediately.
+   Paste and Tab retain native behavior. Editing keys and non-hex text during a strong
+   reader candidate are deferred until it resolves, then applied to the clean field.
+   Ordinary typing outside a reader candidate passes through immediately.
    E/e/3 prefix candidates are the narrow exception: their original text may wait up to 90 ms after
    the last candidate key, or until the next non-candidate/editing key resolves the prefix.
    The fallback recognizes long, fast hexadecimal EPC bursts, not the physical USB device:
@@ -60,10 +62,11 @@
     timer=null;
     const left=deadline-Date.now();
     if(left>2){timer=setTimeout(onEnd,left);return}
-    endBurst(true);
+    epcDropping=false;endBurst(true);
   }
   function endBurst(refocus){
     clearTimeout(timer);timer=null;burst=false;fast=0;slow=0;
+    replayEdits();
     // Only put focus back when it was LOST (page body). Never steal it from where the person clicked.
     const el=beforeEl,a=document.activeElement;
     if(refocus&&el&&el.isConnected&&(!a||a===document.body)){try{el.focus({preventScroll:true})}catch(_){}}
@@ -88,6 +91,26 @@
   let epcPending=null,epcPendingTimer=null,epcPendingDeadline=0,epcDropping=false,epcDropAt=0,epcDropEl=null;
   const writable=el=>Boolean(el&&['INPUT','TEXTAREA'].includes(el.tagName)&&
     !el.disabled&&!el.readOnly&&isField(el));
+  let deferredEdits=[];
+  function replayEdits(){
+    const edits=deferredEdits;deferredEdits=[];
+    for(const {el,key} of edits){
+      if(!writable(el)||el.isConnected===false)continue;
+      let start=el.selectionStart,end=el.selectionEnd;
+      if(typeof start!=='number'||typeof end!=='number')start=end=String(el.value??'').length;
+      let text=key;
+      if(key==='Backspace'||key==='Delete'){
+        text='';
+        if(start===end){
+          if(key==='Backspace')start=Math.max(0,start-1);
+          else end=Math.min(el.value.length,end+1);
+        }
+      }
+      try{el.setRangeText(text,start,end,'end')}
+      catch(_){el.value=el.value.slice(0,start)+text+el.value.slice(end)}
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+  }
   function replayPending(){
     const p=epcPending;epcPending=null;
     if(!p||!writable(p.el))return;
@@ -114,7 +137,7 @@
     epcPendingTimer=null;
     const remain=epcPendingDeadline-Date.now();
     if(remain>2){epcPendingTimer=setTimeout(pendingExpiry,remain);return}
-    replayPending();
+    replayPending();replayEdits();
   }
   function armPending(now,extend=true){
     if(extend)epcPendingDeadline=now+EPC_FRAME_GAP_MS;
@@ -122,7 +145,7 @@
   }
   function flushPending(){
     clearTimeout(epcPendingTimer);epcPendingTimer=null;
-    replayPending();
+    replayPending();replayEdits();
   }
   function discardPending(){
     epcPending=null;clearTimeout(epcPendingTimer);epcPendingTimer=null;
@@ -131,7 +154,7 @@
     if(fast<EPC_FRAME_MIN_KEYS)return;
     const el=epcPending.el;
     discardPending();epcDropping=true;epcDropAt=now;epcDropEl=el;
-    rollback(el);
+    rollback(el);armEnd(now);
   }
   // A keyboard-wedge may mark consecutive identical keys as auto-repeat.
   // Auto-repeat is not a device identity: keep ordinary held keys available,
@@ -159,12 +182,23 @@
     if(readerOpen(el)||e.ctrlKey||e.metaKey||e.altKey||(e.repeat&&!readerRepeat(e,now,scan))||e.isComposing||e.keyCode===229){
       flushPending();epcDropping=false;return;
     }
+    // Editing during a recognized/strong candidate must not split the RFID
+    // frame. Hold the person's edit until the frame ends; replay it against
+    // the clean value, or after the candidate text if it was ordinary typing.
+    const edit=key==='Backspace'||key==='Delete'||
+      (typeof key==='string'&&key.length===1&&!hex);
+    const activeFrame=(epcPending?.el===el&&epcPending.chars.length>=4&&now-epcPending.at<=EPC_FRAME_GAP_MS)||
+      (epcDropping&&epcDropEl===el&&now-epcDropAt<=BURST_HOLD_GAP_MS)||
+      (burst&&beforeEl===el&&now-lastScanKey<=BURST_HOLD_GAP_MS);
+    if(edit&&activeFrame&&writable(el)){
+      deferredEdits.push({el,key});swallow(e);return;
+    }
     if(burst)return;
     if(epcDropping&&el!==epcDropEl)epcDropping=false;
     if(epcDropping){
       if((hex&&now-epcDropAt<=BURST_HOLD_GAP_MS)||
          (key==='Enter'&&now-epcDropAt<=EPC_FRAME_END_MS)){
-        epcDropAt=now;swallow(e);
+        epcDropAt=now;swallow(e);armEnd(now);
         if(key==='Enter'){epcDropping=false;endBurst(false);closingEnter=true;closingEnterAt=now}
         return;
       }

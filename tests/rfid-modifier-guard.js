@@ -214,6 +214,23 @@ for(const surface of ['body','readonly','editable']){
     }
   }
 }
+// A person editing halfway through a reader frame must not release its tail.
+for(const key of ['Backspace','Delete','g',' ']){
+  for(const at of [4,14]){
+    for(const caps of [false,true]){
+      const h=setup(),el=h.field('password');
+      if(caps)h.toggleCaps(el);
+      for(let i=0;i<EPC.length;i++){
+        if(i===at)h.press(el,key,key.length===1?'KeyG':key,1);
+        h.readerKey(el,EPC[i]);
+      }
+      const enter=h.press(el,'Enter','Enter',8);h.advance(800);
+      check(el.value,key==='Backspace'||key==='Delete'?'left  right':'left '+key+' right',
+        `Interleaved ${key} at ${at}, caps ${caps}: preserve edit without tag fragments`);
+      check(enter.defaultPrevented,true,'Interrupted reader Enter remains blocked');
+    }
+  }
+}
 if(failures.length){
   console.error(failures.join('\n\n'));
   console.error(`${failures.length}/${checks} modifier regression checks failed`);process.exitCode=1;
