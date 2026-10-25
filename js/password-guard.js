@@ -30,7 +30,7 @@
   };
   const NOT_TEXT=new Set(['button','checkbox','radio','submit','reset','file','image','range','color','hidden']);
   let last=0,fast=0,burst=false,timer=null,deadline=0,before='',beforeEl=null,selStart=0,selEnd=0,lastScanKey=-Infinity;
-  let candidateAt=0,closingEnter=false;
+  let candidateAt=0,candidatePrefix='',closingEnter=false,closingEnterAt=0;
   const insertionSnapshots=new WeakMap();
   const readerOpen=el=>{const r=globalThis.RFIDScanner;
     if(!r)return false;
@@ -113,8 +113,8 @@
     if(remain>2){epcPendingTimer=setTimeout(pendingExpiry,remain);return}
     replayPending();
   }
-  function armPending(now){
-    epcPendingDeadline=now+EPC_FRAME_GAP_MS;
+  function armPending(now,extend=true){
+    if(extend)epcPendingDeadline=now+EPC_FRAME_GAP_MS;
     if(epcPendingTimer===null)epcPendingTimer=setTimeout(pendingExpiry,EPC_FRAME_GAP_MS);
   }
   function flushPending(){
@@ -130,6 +130,20 @@
     discardPending();epcDropping=true;epcDropAt=now;epcDropEl=el;
     rollback(el);
   }
+  // A keyboard-wedge may mark consecutive identical keys as auto-repeat.
+  // Auto-repeat is not a device identity: keep ordinary held keys available,
+  // but never use it to release an EPC prefix or an already rejected frame.
+  function readerRepeat(e,now,scan){
+    const enter=e.key==='Enter',el=e.target;
+    if(epcDropping&&el===epcDropEl&&
+       ((scan&&now-epcDropAt<=BURST_HOLD_GAP_MS)||(enter&&now-epcDropAt<=EPC_FRAME_END_MS)))return true;
+    if(burst&&el===beforeEl&&
+       ((scan&&now-last<=BURST_HOLD_GAP_MS)||(enter&&now-lastScanKey<=ENTER_AFTER_MS)))return true;
+    if(scan&&epcPending?.el===el&&now-epcPending.at<=EPC_FRAME_GAP_MS&&
+       /^(?:E2|30)$/.test(epcPending.prefix))return true;
+    return Boolean(scan&&el===beforeEl&&fast>=2&&now-last<=CANDIDATE_GAP_MS&&
+      /^(?:E2|30)$/.test(candidatePrefix));
+  }
   document.addEventListener('keydown',e=>{
     // Uppercase HID letters may press/release Shift around each letter. Shift
     // is part of the reader frame, not a reason to replay or release it.
@@ -137,7 +151,9 @@
     // toggle without flushing the pending prefix or releasing a rejected frame.
     if(e.key==='Shift'||e.key==='CapsLock')return;
     const now=Date.now(),el=e.target,key=e.key,scan=scanChar(e),hex=Boolean(scan);
-    if(readerOpen(el)||e.ctrlKey||e.metaKey||e.altKey||e.repeat||e.isComposing||e.keyCode===229){
+    if(closingEnter&&(now-closingEnterAt>ENTER_AFTER_MS||key!=='Enter'))closingEnter=false;
+    if(closingEnter&&key==='Enter'&&e.repeat&&!readerOpen(el)){swallow(e);return}
+    if(readerOpen(el)||e.ctrlKey||e.metaKey||e.altKey||(e.repeat&&!readerRepeat(e,now,scan))||e.isComposing||e.keyCode===229){
       flushPending();epcDropping=false;return;
     }
     if(burst)return;
@@ -146,7 +162,7 @@
       if((hex&&now-epcDropAt<=BURST_HOLD_GAP_MS)||
          (key==='Enter'&&now-epcDropAt<=EPC_FRAME_END_MS)){
         epcDropAt=now;swallow(e);
-        if(key==='Enter'){epcDropping=false;endBurst(false);closingEnter=true}
+        if(key==='Enter'){epcDropping=false;endBurst(false);closingEnter=true;closingEnterAt=now}
         return;
       }
       epcDropping=false;
@@ -155,9 +171,28 @@
       flushPending();
     }
     if(epcPending&&hex){
-      trackCandidate(el,now,now-last);last=now;
+      trackCandidate(el,now,now-last,scan,e.repeat);last=now;
       epcPending.chars+=key;epcPending.at=now;
-      swallow(e);armPending(now);
+      const nextPrefix=epcPending.lastScan+scan;
+      if(!/^(?:E2|30)$/.test(epcPending.prefix)&&/^(?:E2|30)$/.test(nextPrefix)){
+        // A person's briefly held E/e/3 can overlap the next reader prefix.
+        // Replay only those preceding manual characters; keep the new frame.
+        const p=epcPending,manual=p.chars.slice(0,-2),chars=p.chars.slice(-2);
+        if(manual){
+          p.chars=manual;replayPending();
+          const start=p.start+manual.length;
+          epcPending={el,chars,prefix:nextPrefix,before:String(el.value??''),start,end:start,at:now};
+        }else epcPending.prefix=nextPrefix;
+        // A reader can start immediately after a hexadecimal password key.
+        // Its own confirmed prefix owns the rollback baseline, so rejecting
+        // that frame cannot erase the person's preceding character/selection.
+        before=epcPending.before;beforeEl=el;selStart=epcPending.start;selEnd=epcPending.end;
+        candidatePrefix=epcPending.prefix;candidateAt=now;fast=2;
+      }else if(epcPending.prefix.length<2)epcPending.prefix+=scan;
+      epcPending.lastScan=scan;
+      // Repeating one key after a weak two/three-key prefix is ordinary held-key
+      // input, not further scanner evidence. It cannot extend buffering forever.
+      swallow(e);armPending(now,!e.repeat||fast>=4);
       recognizePending(now);
       return;
     }
@@ -165,29 +200,32 @@
     // They cover the confirmed reader EPC and the original QuickMart sample
     // EPCs while keeping typical ordinary typing immediate.
     if(writable(el)&&(scan==='E'||scan==='3')){
-      trackCandidate(el,now,now-last);last=now;
+      trackCandidate(el,now,now-last,scan,e.repeat);last=now;
       let start=String(el.value??'').length,end=start;
       try{
         if(typeof el.selectionStart==='number')start=el.selectionStart;
         if(typeof el.selectionEnd==='number')end=el.selectionEnd;
       }catch(_){}
-      epcPending={el,chars:key,start,end,at:now};
+      epcPending={el,chars:key,prefix:scan,lastScan:scan,before:String(el.value??''),start,end,at:now};
       swallow(e);armPending(now);recognizePending(now);
     }
   },true);
 
-  function resetCandidate(el,now){
-    fast=1;candidateAt=now;remember(el);
+  function resetCandidate(el,now,scan){
+    fast=1;candidateAt=now;candidatePrefix=scan;remember(el);
   }
-  function trackCandidate(el,now,gap){
+  function trackCandidate(el,now,gap,scan,repeat){
     if(el!==beforeEl||gap>CANDIDATE_GAP_MS||!fast||now-candidateAt>BURST_HOLD_GAP_MS*BURST_KEYS){
-      resetCandidate(el,now);snapshot(el);return;
+      resetCandidate(el,now,scan);snapshot(el);return;
     }
+    if(candidatePrefix.length<2)candidatePrefix+=scan;
     // Preserve the original prefix through short USB pauses, even before the
     // first two keys establish a fast run. Previously a pause
     // reset the rollback baseline to include scanner characters already inserted.
     // normal typing speed: slower keys do not increase the fast-key count.
-    if(gap<KEY_GAP_MS)fast++;
+    // Held keys do not supply additional evidence of a scanner. Once a frame
+    // is identified its repeats are still swallowed by the frame handlers.
+    if(gap<KEY_GAP_MS&&!repeat)fast++;
   }
   function isBulkFrame(text){
     return typeof text==='string'&&/^(?:EPC[:=\s]+)?[A-Fa-f0-9]{6,100}[\r\n]*$/.test(text);
@@ -233,7 +271,8 @@
   document.addEventListener('keydown',e=>{
     if(e.key==='Shift'||e.key==='CapsLock')return;
     if(e.defaultPrevented)return;
-    if(readerOpen(e.target)||e.ctrlKey||e.metaKey||e.altKey||e.repeat||e.isComposing||e.keyCode===229){
+    if(readerOpen(e.target)||e.ctrlKey||e.metaKey||e.altKey||
+       (e.repeat&&!readerRepeat(e,Date.now(),scanChar(e)))||e.isComposing||e.keyCode===229){
       if(burst||fast)endBurst(false);lastScanKey=-Infinity;return;
     }
     const key=e.key,scan=scanChar(e),enter=key==='Enter',printable=typeof key==='string'&&key.length===1;
@@ -246,7 +285,7 @@
         lastScanKey=now;swallow(e);
         // Enter completes the frame. Do not hold the following person's hex
         // keys for another frame-pause interval after the reader has finished.
-        if(enter){endBurst(false);closingEnter=true}else armEnd(now);
+        if(enter){endBurst(false);closingEnter=true;closingEnterAt=now}else armEnd(now);
         return;
       }
       endBurst(false);
@@ -264,7 +303,7 @@
     // letters also occur in normal typing, so they must never trigger a rollback.
     // Rich contenteditable fields are not rewritten by this plain-input fallback.
     if(el?.isContentEditable){fast=0;return}
-    trackCandidate(el,now,gap);
+    trackCandidate(el,now,gap,scan,e.repeat);
     if(fast>=BURST_KEYS){burst=true;lastScanKey=now;swallow(e);rollback(el);armEnd(now)}
   },true);
   ['keypress','keyup'].forEach(type=>document.addEventListener(type,e=>{

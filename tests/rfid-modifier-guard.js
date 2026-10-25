@@ -66,7 +66,8 @@ function setup(){
         }
       }
     }
-    fire('keyup',element,details);return event;
+    if(!properties.keepHeld)fire('keyup',element,details);
+    return event;
   }
   function toggleCaps(element){
     advance(2);
@@ -79,35 +80,44 @@ function setup(){
     advance(2);heldShift=pressed;
     fire(pressed?'keydown':'keyup',element,{key:'Shift',code:'ShiftLeft',shiftKey:pressed});
   }
-  function readerKey(element,char){
+  function readerKey(element,char,repeat=false,keepHeld=false){
     const letter=/[A-F]/.test(char),effectiveShift=heldShift||letter;
     // The reader requests uppercase letters using Shift. CapsLock inverts them;
     // a person's held Shift turns the reader's number-row digits into symbols.
     const key=letter?(effectiveShift!==caps?char:char.toLowerCase()):
       effectiveShift?SHIFTED_DIGITS[Number(char)]:char;
     if(letter&&!heldShift)fire('keydown',element,{key:'Shift',code:'ShiftLeft',shiftKey:true});
-    const event=press(element,key,letter?'Key'+char:'Digit'+char,8,{shiftKey:effectiveShift});
+    const event=press(element,key,letter?'Key'+char:'Digit'+char,8,{shiftKey:effectiveShift,repeat,keepHeld});
     if(letter&&!heldShift)fire('keyup',element,{key:'Shift',code:'ShiftLeft',shiftKey:false});
     return {event,key};
   }
-  function scan(element,{text=EPC,capsAt=[],shiftAt={},label='reader'}={}){
+  function scan(element,{text=EPC,capsAt=[],shiftAt={},label='reader',repeatConsecutive=false,repeatEnter=false}={}){
     advance(700);const values=[],capsEvents=[];let emitted='';
     for(let index=0;index<=text.length;index++){
       if(capsAt.includes(index))capsEvents.push(toggleCaps(element));
       if(Object.hasOwn(shiftAt,index))shift(element,shiftAt[index]);
-      if(index<text.length){const result=readerKey(element,text[index]);emitted+=result.key;values.push(element.value)}
+      if(index<text.length){
+        const result=readerKey(element,text[index],repeatConsecutive&&text[index]===text[index-1],
+          repeatConsecutive&&text[index]===text[index+1]);
+        emitted+=result.key;values.push(element.value);
+      }
     }
-    const enter=press(element,'Enter','Enter');advance(800);
-    return {values,capsEvents,enter,emitted,label};
+    const enter=press(element,'Enter','Enter',8,{keepHeld:repeatEnter});
+    const repeatedEnter=repeatEnter?press(element,'Enter','Enter',8,{repeat:true}):null;
+    advance(800);
+    return {values,capsEvents,enter,repeatedEnter,emitted,label};
   }
   function loadScanner(){
     vm.runInContext(fs.readFileSync('assets/js/rfid-scanner.js','utf8'),sandbox);
     sandbox.RFIDScanner.enable();return sandbox.RFIDScanner;
   }
   function body(){document.activeElement=document.body;return document.body}
-  return {sandbox,field,body,loadScanner,events,advance,press,toggleCaps,shift,scan};
+  return {sandbox,field,body,loadScanner,events,advance,press,toggleCaps,shift,scan,readerKey};
 }
 
+if(require.main!==module){
+  module.exports={setup};
+}else{
 // CapsLock remains a real keyboard mode change, including while an EPC is held
 // or dropped. Its non-printable event cannot flush/reset the reader candidate.
 for(const capsAt of [[0],[1],[2],[12],[23],[EPC.length],[0,2,12,23]]){
@@ -184,3 +194,4 @@ if(failures.length){
   console.error(failures.join('\n\n'));
   console.error(`${failures.length}/${checks} modifier regression checks failed`);process.exitCode=1;
 }else console.log(`${checks} modifier regression checks passed (synthetic physical codes; USB identity unverified)`);
+}
