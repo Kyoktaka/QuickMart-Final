@@ -34,6 +34,7 @@ const human=(el,text,gap=140)=>[...text].map(c=>press(el,c,gap));
 // A tag read starts after a pause, then characters arrive ~8 ms apart and Enter closes it.
 const reader=(el,text,gap=8)=>{const out=[...text].map((c,i)=>press(el,c,i?gap:300));out.push(press(el,'Enter',gap));return out};
 const EPC='E2827802000000000DFFD26D';
+const SAMPLE_EPC='30142B8A004C2000000463';
 
 // 1) A person typing a password at normal speed is never touched, Enter included.
 const pw=field();
@@ -44,15 +45,25 @@ assert.equal(press(pw,'Enter',200),false,"A person's Enter must still submit");
 // 2) A tag read while a field is focused is discarded, rolled back, and its Enter is swallowed. No message.
 pw.value='';human(pw,'Secret');
 const swallowed=reader(pw,EPC);
+assert.equal(swallowed[0],true,'The FIRST character of an EPC must never appear in a field');
+assert.equal(swallowed[1],true,'The SECOND character of an EPC must never appear in a field');
 assert.equal(pw.value,'Secret',"Only the manager's own typing remains; the EPC is rolled back");
 assert.equal(swallowed.at(-1),true,"The reader's closing Enter must NOT submit the form");
 assert.equal(swallowed.slice(11).every(Boolean),true,'Everything after a complete fast hex prefix is detected is blocked');
-assert.deepEqual(pw.events,['input'],'A rolled-back field tells the page (live search / meters refresh)');
+assert.deepEqual(pw.events,[],'The reader EPC is discarded before it alters the input or fires a misleading input event');
+
+
+const originalEpcCount=pw.value;
+const otherPrefix=reader(pw,SAMPLE_EPC);
+assert.equal(otherPrefix[0],true,'First 3 of 30-prefixed EPC is buffered before input insertion');
+assert.equal(pw.value,originalEpcCount,'A 30-prefixed sample EPC also cannot leak into a textbox');
 
 // 3) After the burst ends, typing works again; the next scan is blocked again.
 assert.equal(typeof endBurst,'function');endBurst();
-assert(human(pw,'123').every(x=>x===false));
-assert.equal(pw.value,'Secret123');
+assert(human(pw,'12').every(x=>x===false));
+assert.equal(press(pw,'3',140),true,'A possible start of a 30-prefixed EPC is briefly buffered');
+endBurst();
+assert.equal(pw.value,'Secret123','Ordinary standalone 3 is replayed without data loss');
 reader(pw,EPC);assert.equal(pw.value,'Secret123');
 endBurst();
 

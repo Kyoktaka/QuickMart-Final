@@ -40,7 +40,16 @@ function press(target,key,gap){
   return e;
 }
 function scan(target,epc){
-  advance(600);for(const char of epc)press(target,char,7);return press(target,'Enter',7);
+  advance(600);
+  const startingValue=target?.value;
+  for(const char of epc){
+    press(target,char,7);
+    // The reader-shaped E2/30 frame must not flash its first 2-3 letters.
+    if(startingValue!==undefined&&!scanner.getBridgeHealth().lastVerifiedConnected&&
+       (epc.startsWith('E2')||epc.startsWith('30')))
+      assert.equal(target.value,startingValue,'RFID EPC must never appear, even partially, in editable fields');
+  }
+  return press(target,'Enter',7);
 }
 scanner.enable();
 const search=input('milk ');
