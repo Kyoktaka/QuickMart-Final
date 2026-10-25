@@ -91,11 +91,6 @@
   function replayPending(){
     const p=epcPending;epcPending=null;
     if(!p||!writable(p.el))return;
-    // 3+ chars arrived at reader speed: partial scanner frame that timed out.
-    // Discard the buffered chars and roll back rather than pasting half a tag.
-    if(fast>=3&&beforeEl===p.el){
-      rollback(p.el);epcDropping=true;epcDropAt=Date.now();epcDropEl=p.el;return;
-    }
     const el=p.el,old=String(el.value??'');
     const start=Math.min(p.start,old.length),end=Math.min(Math.max(start,p.end),old.length);
     // If a USB pause expires the prefix buffer, the fallback must still know
@@ -132,11 +127,8 @@
   function discardPending(){
     epcPending=null;clearTimeout(epcPendingTimer);epcPendingTimer=null;
   }
-  // Recognize after half the expected frame length — partial bursts confirmed
-  // faster without waiting for all 24 reader chars.
-  const EPC_RECOG_KEYS=Math.ceil(EPC_FRAME_MIN_KEYS/2);
   function recognizePending(now){
-    if(fast<EPC_RECOG_KEYS)return;
+    if(fast<EPC_FRAME_MIN_KEYS)return;
     const el=epcPending.el;
     discardPending();epcDropping=true;epcDropAt=now;epcDropEl=el;
     rollback(el);

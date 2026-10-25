@@ -13,6 +13,8 @@ const latchedEpcs=new Set();      // every EPC in (or waiting to join) the cart
 const removedEpcs=new Map();      // EPC -> time it was last seen missing (null = still being read)
 const rejectedEpcs=new Set();     // unknown / inactive EPCs, ignored until the session resets
 const absentEpcs=new Set();       // explicit reader expiry, distinct from a cleared or paused snapshot
+const removedReadAt=new Map();    // removed EPC -> time of its latest read, to spot a lift-off and re-present
+const REARM_GAP_MS=1500;
 // A removed tag is re-armed on an actual reader absence event, without a second fixed waiting period.
 const CHECKOUT_STORAGE='qm_checkout';
 let checkoutSession=null,reviewedRevision=null,saveChain=Promise.resolve(),navigationProtected=false;
@@ -221,11 +223,11 @@ async function finalize(status,reason){
 
 /* ---------- reset helpers ---------- */
 function clearCartMemory(){
-  latchedEpcs.clear();removedEpcs.clear();rejectedEpcs.clear();blockedShownAt.clear();
+  latchedEpcs.clear();removedEpcs.clear();removedReadAt.clear();rejectedEpcs.clear();blockedShownAt.clear();
   clearTimeout(retryTimer);retryTimer=null;retryCount=0;
 }
 // Cancelled items may still be lying on the reader; keep them out until they are really gone.
-function holdCurrentTags(){for(const epc of latchedEpcs)removedEpcs.set(epc,null)}
+function holdCurrentTags(){for(const epc of latchedEpcs){removedEpcs.set(epc,null);removedReadAt.delete(epc)}}
 function resetKiosk(keepHeld=false,forgetSaved=true){
   const held=keepHeld?new Map(removedEpcs):null;
   clearTimeout(detectDebounce);detectDebounce=null;
@@ -274,8 +276,22 @@ function absorbEpcs(list){
 function releaseRemoved(epc){
   if(typeof epc!=='string'||!removedEpcs.size||!RFIDScanner.isEnabled())return;
   if(typeof RFIDScanner.isBlocked==='function'&&RFIDScanner.isBlocked())return;
-  removedEpcs.delete(normEpc(epc));rememberCart();
+  removedEpcs.delete(normEpc(epc));removedReadAt.delete(normEpc(epc));rememberCart();
 }
+// A removed tag read again after a gap was lifted off the reader and presented again: the
+// customer changed their mind, so add it now instead of waiting for the absence timeout.
+// The first read after removal only sets the baseline.
+window.addEventListener('rfid:read',event=>{
+  const epc=normEpc(event.detail?.epc),at=event.detail?.at;
+  if(!epc||!removedEpcs.has(epc)||typeof at!=='number')return;
+  if(!state.kioskOn||!RFIDScanner.isEnabled()||(RFIDScanner.isBlocked?.()))return;
+  const previous=removedReadAt.get(epc);removedReadAt.set(epc,at);
+  if(previous===undefined)return;
+  const cycle=RFIDScanner.getReadHealth?.().estimatedInventoryCycleMs||0;
+  if(at-previous<Math.max(REARM_GAP_MS,cycle*3))return;
+  removedEpcs.delete(epc);removedReadAt.delete(epc);rememberCart();
+  queueTray([epc]);
+});
 window.addEventListener('rfid:absent',event=>{
   const epc=normEpc(event.detail?.epc);if(epc)absentEpcs.add(epc);
   releaseRemoved(epc);if(state.kioskOn)renderCart();
@@ -362,26 +378,19 @@ function openRemoveModal(productId){
   drawRemoveCount();document.activeElement?.blur?.();openHold('m-remove');
 }
 function closeRemoveModal(){removeTarget=null;closeHold('m-remove')}
-// Removes `count` units of a product. The tag is un-latched immediately so it
-// can be re-scanned right away if the customer changed their mind. Physically
-// lifting the tag off the reader is only necessary if they don't want it.
+// Removes `count` units of a product. The removed tags are blocked until they leave the reader.
 function removeFromCart(productId,count){
   const item=state.cart.find(i=>i.id===productId);if(!item)return false;
   const n=Math.max(1,Math.min(Math.floor(Number(count))||1,item.scanned.length));
   const gone=item.scanned.slice(item.scanned.length-n);
-  // Un-latch only — do NOT add to removedEpcs. The next tray event re-absorbs
-  // any tag still on the reader, so the customer can immediately re-scan.
-  // A truly unwanted item must be lifted off the reader to stay out of the cart.
-  for(const epc of gone){latchedEpcs.delete(epc);removedEpcs.delete(epc)}
+  for(const epc of gone){latchedEpcs.delete(epc);removedReadAt.delete(epc);if(!absentEpcs.has(epc))removedEpcs.set(epc,null)}
   item.scanned=item.scanned.slice(0,item.scanned.length-n);item.qty=item.scanned.length;
   if(!item.qty)state.cart=state.cart.filter(i=>i!==item);
   renderCart();
   if(!state.cart.length)screen('k-idle');
   void saveCart();
   scheduleLookup();   // re-verify what is left (and anything still waiting to join)
-  // Tag still on reader? Next tray sweep re-adds it automatically.
-  const stillPresent=gone.some(epc=>!absentEpcs.has(normEpc(epc)));
-  toast('Removed '+(n>1?n+' × ':'')+item.name+'.'+(stillPresent?' Scan again to re-add, or lift it off to keep it removed.':''));
+  toast('Removed '+(n>1?n+' × ':'')+item.name+'. Take it off the reader.');
   return true;
 }
 $('#cart-body').addEventListener('click',e=>{

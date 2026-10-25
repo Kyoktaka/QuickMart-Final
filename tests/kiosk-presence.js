@@ -163,6 +163,18 @@ async function main(){
   await settle(requests.at(-1));
   assert.equal(qtyOf(2),2);
 
+  // A removed tag that is lifted off and presented again is re-added at once, without waiting for expiry.
+  const read=(epc,at)=>listeners['rfid:read']({detail:{epc,at}});
+  assert.equal(run("removedEpcs.has('BEPC0003')"),true);
+  read('BEPC0003',now);now+=300;read('BEPC0003',now);
+  assert.equal(run("removedEpcs.has('BEPC0003')"),true,'A tag read continuously stays removed');
+  now+=3000;read('BEPC0003',now);
+  assert.equal(run("removedEpcs.has('BEPC0003')"),false,'A tag presented again after a gap is released immediately');
+  await advance(180);await settle(requests.at(-1));
+  assert.equal(qtyOf(2),3,'The re-presented tag returns to the cart');
+  run("removeFromCart(2,1)");await advance(180);await settle(requests.at(-1));
+  assert.equal(qtyOf(2),2);
+
   // ---- REMOVE: whole product line, then everything -> welcome screen ----
   run("removeFromCart(1,999)");
   assert.equal(qtyOf(1),0,'Removing more than the quantity removes the line');
