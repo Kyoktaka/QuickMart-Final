@@ -38,19 +38,21 @@ const SAMPLE_EPC='30142B8A004C2000000463';
 
 // 1) A person typing a password at normal speed is never touched, Enter included.
 const pw=field();
-assert(human(pw,'Correct#Pass1').every(x=>x===false));
+assert.deepEqual(human(pw,'Correct#Pass1'),[...'Correct#Pass1'].map(c=>c==='e'),
+  'Only the possible lowercase EPC prefix is briefly held; its original character is replayed');
 assert.equal(pw.value,'Correct#Pass1');
 assert.equal(press(pw,'Enter',200),false,"A person's Enter must still submit");
 
 // 2) A tag read while a field is focused is discarded, rolled back, and its Enter is swallowed. No message.
 pw.value='';human(pw,'Secret');
+const beforeReaderEvents=[...pw.events];
 const swallowed=reader(pw,EPC);
 assert.equal(swallowed[0],true,'The FIRST character of an EPC must never appear in a field');
 assert.equal(swallowed[1],true,'The SECOND character of an EPC must never appear in a field');
 assert.equal(pw.value,'Secret',"Only the manager's own typing remains; the EPC is rolled back");
 assert.equal(swallowed.at(-1),true,"The reader's closing Enter must NOT submit the form");
 assert.equal(swallowed.slice(11).every(Boolean),true,'Everything after a complete fast hex prefix is detected is blocked');
-assert.deepEqual(pw.events,[],'The reader EPC is discarded before it alters the input or fires a misleading input event');
+assert.deepEqual(pw.events,beforeReaderEvents,'The reader EPC adds no input event beyond prior human prefix replay');
 
 
 const originalEpcCount=pw.value;
@@ -127,7 +129,8 @@ assert.equal(reader(logout,EPC).slice(11).every(Boolean),true);endBurst();
   sandbox.RFIDScanner={isEnabled:()=>true,isBlocked:()=>false};
   const f=field('search','milk');reader(f,EPC);
   assert.equal(f.value,'milk','Focused search is protected even while scanning is enabled');endBurst();
-  assert(human(f,'James2026',7).every(x=>x===false),'Fast ordinary typing must not be mistaken for four scanner keys');
+  assert.deepEqual(human(f,'James2026',7),[...'James2026'].map(c=>c==='e'),
+    'A lowercase prefix candidate may wait briefly; ordinary fast typing is still preserved');
   assert.equal(f.value,'milkJames2026');
 }
 

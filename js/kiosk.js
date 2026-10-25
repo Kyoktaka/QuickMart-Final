@@ -432,7 +432,7 @@ function armBurstEnd(){
   },SCANNER_BURST_END_MS);
 }
 $('#tag-modal-input').addEventListener('keydown',e=>{
-  if(e.key==='Shift')return;
+  if(e.key==='Shift'||e.key==='CapsLock')return;
   // The application-wide capture guard owns scanner filtering on real pages;
   // do not run a second independent detector with a different rollback baseline.
   if(globalThis.QuickMartInputGuard){
@@ -445,6 +445,7 @@ $('#tag-modal-input').addEventListener('keydown',e=>{
   }
   if(e.ctrlKey||e.metaKey||e.altKey||e.repeat){resetTagTypingGuard();return}
   const enter=e.key==='Enter',printable=typeof e.key==='string'&&e.key.length===1;
+  const hex=printable&&(SCANNER_HEX_KEY.test(e.key)||/^(?:Digit[0-9]|Key[A-F])$/.test(e.code||''));
   const raw=RFIDScanner.getBridgeHealth?.();
   if(raw?.connected||(raw?.paused&&raw.lastVerifiedConnected)){
     resetTagTypingGuard();if(enter){e.preventDefault();void submitTagModal()}return;
@@ -454,11 +455,11 @@ $('#tag-modal-input').addEventListener('keydown',e=>{
   if(tkBurst){
     // Reader still typing (and its closing Enter): discard the recognized frame.
     // A slower or non-hex key ends the burst so ordinary input can resume.
-    if((SCANNER_HEX_KEY.test(e.key)&&gap<=SCANNER_HOLD_GAP_MS)||enter){e.preventDefault();armBurstEnd();return}
+    if((hex&&gap<=SCANNER_HOLD_GAP_MS)||enter){e.preventDefault();armBurstEnd();return}
     resetTagTypingGuard();
   }
   if(enter){e.preventDefault();void submitTagModal();return}
-  if(!SCANNER_HEX_KEY.test(e.key)){tkFastRun=0;return}
+  if(!hex){tkFastRun=0;return}
   if(gap>=SCANNER_KEY_GAP_MS||!tkFastRun){tkFastRun=1;tkBefore=field.value;return}
   if(++tkFastRun>=SCANNER_BURST_KEYS){
     tkBurst=true;e.preventDefault();field.value=tkBefore;

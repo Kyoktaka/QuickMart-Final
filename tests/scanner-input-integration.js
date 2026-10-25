@@ -53,8 +53,9 @@ function scan(target,epc){
 }
 scanner.enable();
 const search=input('milk ');
-for(const char of 'James2026')assert.equal(press(search,char,7).defaultPrevented,false);
-assert.equal(search.value,'milk James2026','Ordinary fast input passes immediately without buffering');
+for(const char of 'James2026')assert.equal(press(search,char,7).defaultPrevented,char==='e',
+  'Only the lowercase EPC prefix candidate is briefly buffered');
+assert.equal(search.value,'milk James2026','Narrow prefix replay preserves the exact ordinary typing');
 const before=search.value;
 assert.equal(scan(search,'E28011700000021905AC150B').defaultPrevented,true,
   'Reader closing Enter cannot submit the focused form during active scanning');

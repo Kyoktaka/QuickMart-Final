@@ -7,6 +7,8 @@
    - nothing focused / a button focused (Logout, Cancel, ...): recognized reader characters and its closing Enter
      are swallowed, so a recognized burst cannot click a button; slow or unsupported frames remain ambiguous
    Paste, Backspace, Tab and Space are never intercepted. Ordinary typing is passed through immediately.
+   E/e/3 prefix candidates are the narrow exception: their original text may wait up to 90 ms after
+   the last candidate key, or until the next non-candidate/editing key resolves the prefix.
    The fallback recognizes long, fast hexadecimal EPC bursts, not the physical USB device:
    sufficiently fast hexadecimal typing remains ambiguous, and slow/non-hex reader output may leak.
    Only a verified independent raw-USB interface can separate the devices reliably.
@@ -18,6 +20,14 @@
   // (so ordinary slower typing resumes even if the reader keeps reading, e.g. a tag lying on the antenna).
   const KEY_GAP_MS=85,CANDIDATE_GAP_MS=240,BURST_HOLD_GAP_MS=340,BURST_KEYS=12,BURST_END_MS=400,ENTER_AFTER_MS=500;
   const SCAN_CHAR=/^[A-Fa-f0-9]$/;
+  // Shift/Caps Lock change event.key, including digits into punctuation. Use
+  // physical hex positions only for frame recognition; replay the original
+  // character when the candidate is ordinary typing.
+  const scanChar=e=>{
+    if(typeof e.key!=='string'||e.key.length!==1)return '';
+    if(/^(?:Digit[0-9]|Key[A-F])$/.test(e.code||''))return e.code.slice(-1);
+    return SCAN_CHAR.test(e.key)?e.key.toUpperCase():'';
+  };
   const NOT_TEXT=new Set(['button','checkbox','radio','submit','reset','file','image','range','color','hidden']);
   let last=0,fast=0,burst=false,timer=null,deadline=0,before='',beforeEl=null,selStart=0,selEnd=0,lastScanKey=-Infinity;
   let candidateAt=0,closingEnter=false;
@@ -67,6 +77,8 @@
   // inserts it. The old 12-key detector can roll back a read but briefly shows
   // its prefix in a focused textbox. This preflight eliminates that flash for
   // the verified reader-shaped frames without buffering ordinary prose.
+  // A possible E/e/3 prefix is briefly held even during ordinary prose; exact
+  // event.key characters and selection are replayed if no reader frame forms.
   // Keyboard-wedge input is still indistinguishable from identical fast human
   // input; other EPC prefixes/slow protocols rely on the conservative fallback.
   const EPC_FRAME_GAP_MS=90,EPC_FRAME_MIN_KEYS=BURST_KEYS,EPC_FRAME_END_MS=600;
@@ -121,8 +133,10 @@
   document.addEventListener('keydown',e=>{
     // Uppercase HID letters may press/release Shift around each letter. Shift
     // is part of the reader frame, not a reason to replay or release it.
-    if(e.key==='Shift')return;
-    const now=Date.now(),el=e.target,key=e.key,hex=typeof key==='string'&&SCAN_CHAR.test(key);
+    // Caps Lock can also occur between reader characters. Preserve its native
+    // toggle without flushing the pending prefix or releasing a rejected frame.
+    if(e.key==='Shift'||e.key==='CapsLock')return;
+    const now=Date.now(),el=e.target,key=e.key,scan=scanChar(e),hex=Boolean(scan);
     if(readerOpen(el)||e.ctrlKey||e.metaKey||e.altKey||e.repeat||e.isComposing||e.keyCode===229){
       flushPending();epcDropping=false;return;
     }
@@ -150,7 +164,7 @@
     // Deliberately narrow start-of-frame candidates: E2xx... and 30xx...
     // They cover the confirmed reader EPC and the original QuickMart sample
     // EPCs while keeping typical ordinary typing immediate.
-    if(writable(el)&&(key==='E'||key==='3')){
+    if(writable(el)&&(scan==='E'||scan==='3')){
       trackCandidate(el,now,now-last);last=now;
       let start=String(el.value??'').length,end=start;
       try{
@@ -217,18 +231,18 @@
   },true);
   document.addEventListener('focusin',e=>{snapshot(e.target)},true);
   document.addEventListener('keydown',e=>{
-    if(e.key==='Shift')return;
+    if(e.key==='Shift'||e.key==='CapsLock')return;
     if(e.defaultPrevented)return;
     if(readerOpen(e.target)||e.ctrlKey||e.metaKey||e.altKey||e.repeat||e.isComposing||e.keyCode===229){
       if(burst||fast)endBurst(false);lastScanKey=-Infinity;return;
     }
-    const key=e.key,enter=key==='Enter',printable=typeof key==='string'&&key.length===1;
+    const key=e.key,scan=scanChar(e),enter=key==='Enter',printable=typeof key==='string'&&key.length===1;
     if(!enter&&!printable){endBurst(false);lastScanKey=-Infinity;snapshot(e.target);return}
     const el=e.target,field=isField(el),now=Date.now(),gap=now-last;last=now;
     if(burst&&el!==beforeEl){endBurst(false);lastScanKey=-Infinity}
     if(burst){
       // Reader still typing + its closing Enter: swallow. A slower key is a person: end the burst, let it through.
-      if((SCAN_CHAR.test(key)&&gap<=BURST_HOLD_GAP_MS)||(enter&&now-lastScanKey<=ENTER_AFTER_MS)){
+      if((scan&&gap<=BURST_HOLD_GAP_MS)||(enter&&now-lastScanKey<=ENTER_AFTER_MS)){
         lastScanKey=now;swallow(e);
         // Enter completes the frame. Do not hold the following person's hex
         // keys for another frame-pause interval after the reader has finished.
@@ -242,7 +256,7 @@
       if(!field&&now-lastScanKey<=ENTER_AFTER_MS)swallow(e);
       return;                                                   // a person pressing Enter
     }
-    if(!SCAN_CHAR.test(key)){                                   // non-hex input is left to the person; no inferred device identity
+    if(!scan){                                                // non-hex input is left to the person; no inferred device identity
       fast=0;remember(el);
       return;
     }
