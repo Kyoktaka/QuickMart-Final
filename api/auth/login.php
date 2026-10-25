@@ -10,6 +10,8 @@ if (strlen($email) > 100 || !filter_var($email, FILTER_VALIDATE_EMAIL)
     json_response(['success' => false, 'message' => 'Enter a valid email and password.'], 422);
 }
 
+attempt_block_if_locked('login');
+
 try {
     $stmt = auth_database()->prepare(
         'SELECT admin_id, admin_name, email, password_hash, status FROM ADMINtbl WHERE email = :email LIMIT 1'
@@ -17,7 +19,7 @@ try {
     $stmt->execute(['email' => $email]);
     $manager = $stmt->fetch();
     if (!$manager || !password_verify($password, $manager['password_hash']) || (int) $manager['status'] !== 1) {
-        json_response(['success' => false, 'message' => 'Incorrect email or password.'], 401);
+        attempt_fail('login', 'Incorrect email or password.');
     }
 } catch (PDOException $e) {
     error_log('QuickMart login lookup failed.');
@@ -29,6 +31,7 @@ if (!session_regenerate_id(true)) {
     json_response(['success' => false, 'message' => 'Could not start manager session.'], 503);
 }
 clear_manager_session();
+attempt_reset('login');
 $_SESSION['manager_authenticated'] = true;
 $_SESSION['manager_id'] = (int) $manager['admin_id'];
 $_SESSION['manager_name'] = $manager['admin_name'];

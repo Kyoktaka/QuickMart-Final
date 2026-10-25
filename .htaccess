@@ -1,0 +1,6 @@
+Options -Indexes
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(?:\.git|vendor|database|tests|tools|rfid-bridge)(?:/|$) - [F,L,NC]
+  RewriteRule ^(?:\.env(?:\..*)?|composer\.(?:json|lock))$ - [F,L,NC]
+</IfModule>

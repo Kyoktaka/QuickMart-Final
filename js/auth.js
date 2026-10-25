@@ -1,5 +1,22 @@
 /* Password verification and secure email reset, adapted to final frontend modal. */
 let pendingPasswordResetToken=null;
+/* 3 wrong passwords lock the popup for a short time (the PHP server enforces it too). */
+let pwLockTimer=null,pwLockUntil=0;
+function stopPwLock(){
+  clearInterval(pwLockTimer);pwLockTimer=null;pwLockUntil=0;
+  const b=$('#btn-pw'),i=$('#auth-pw');if(b)b.disabled=false;if(i)i.disabled=false;
+}
+function startPwLock(seconds){
+  clearInterval(pwLockTimer);pwLockUntil=Date.now()+seconds*1000;
+  const i=$('#auth-pw');if(i)i.value='';
+  const tick=()=>{
+    const s=Math.ceil((pwLockUntil-Date.now())/1000);
+    if(s<=0){stopPwLock();$('#e2').textContent='';setTimeout(()=>$('#auth-pw')?.focus(),30);return}
+    $('#btn-pw').disabled=true;$('#auth-pw').disabled=true;
+    $('#e2').textContent='Too many failed attempts. Try again in '+s+' second'+(s===1?'':'s')+'.';
+  };
+  tick();pwLockTimer=setInterval(tick,500);
+}
 function authStep(n){
   document.querySelectorAll('.astep').forEach(e=>e.classList.toggle('on',e.id==='as'+n));
   document.querySelectorAll('.err').forEach(e=>e.textContent='');
@@ -11,11 +28,13 @@ function openAuth(cb,step=2){
   ['#auth-pw','#rs-gmail','#rs-new','#rs-conf'].forEach(s=>{const e=$(s);if(e)e.value=''});
   if(window.RFIDScanner)RFIDScanner.disable();
   authStep([4,5].includes(step)?step:2);openModal('m-auth');
+  if(pwLockUntil>Date.now())startPwLock((pwLockUntil-Date.now())/1000);
 }
 function closeAuth(){
   // A focused hidden manager password field must not intercept resumed RFID reads.
   if(document.activeElement?.closest?.('#m-auth'))document.activeElement.blur();
   closeModal('m-auth');state.authCb=null;
+  if(state.kioskOn&&typeof syncScannerHold==='function'){syncScannerHold();return}
   if(window.RFIDScanner&&state.kioskOn&&($('#k-idle')?.classList.contains('on')||$('#k-cart')?.classList.contains('on'))){RFIDScanner.enable()}
 }
 function openPasswordResetLink(){
@@ -27,10 +46,12 @@ function openPasswordResetLink(){
   pendingPasswordResetToken=token;openAuth(null,5);return true;
 }
 $('#btn-pw').onclick=async()=>{
+  if(Date.now()<pwLockUntil)return;
   const pw=$('#auth-pw').value,btn=$('#btn-pw');if(!pw)return $('#e2').textContent='Enter your password.';
   btn.disabled=true;
-  try{await Backend.verifyPassword(pw);const cb=state.authCb;closeAuth();if(cb)await cb()}
-  catch(e){$('#e2').textContent=e.message}finally{btn.disabled=false}
+  try{await Backend.verifyPassword(pw);stopPwLock();const cb=state.authCb;closeAuth();if(cb)await cb()}
+  catch(e){$('#e2').textContent=e.message;if(e.data?.retry_after>0)startPwLock(e.data.retry_after)}
+  finally{btn.disabled=Date.now()<pwLockUntil}
 };
 // There is no master-key or RFID manager-card bypass on the secured backend.
 $('#btn-mk').onclick=()=>{$('#e3').textContent='Use manager password verification.'};

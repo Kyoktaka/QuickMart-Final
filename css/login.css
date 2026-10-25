@@ -38,3 +38,37 @@
 .lg-form.active>*:nth-child(n+9){animation-delay:.5s}
 .lg-form.active.out{animation:qmCardOut .23s ease forwards}
 .lg-form.active.shake{animation:qmShake .45s ease}
+
+/* live password-match indicator (sign up) */
+.lg-match{display:flex;align-items:center;gap:6px;min-height:20px;margin:-8px 0 8px;font-size:13px;font-weight:600}
+.lg-match.ok{color:var(--ok)}
+.lg-match.bad{color:var(--bad)}
+.lg-match.ok::before,.lg-match.bad::before{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;line-height:1;flex-shrink:0}
+.lg-match.ok::before{content:"\2713";background:var(--ok)}
+.lg-match.bad::before{content:"\2715";background:var(--bad)}
+.lg-field.is-match input,.lg-field.is-match input:focus{border-color:var(--ok);box-shadow:0 0 0 3px rgba(46,139,87,.16)}
+.lg-field.is-mismatch input,.lg-field.is-mismatch input:focus{border-color:var(--bad);box-shadow:0 0 0 3px rgba(214,69,69,.14)}
+
+/* "Account successfully created" banner */
+.lg-banner{position:fixed;top:22px;left:50%;z-index:5;display:flex;align-items:center;gap:14px;width:min(92vw,460px);padding:14px 16px;background:#e8f6ed;border:1px solid #9fd5b3;border-left:5px solid var(--ok);border-radius:14px;box-shadow:0 14px 36px rgba(4,83,54,.22);transform:translate(-50%,-24px);opacity:0;pointer-events:none;transition:opacity .35s ease,transform .45s cubic-bezier(.2,.8,.2,1)}
+.lg-banner.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.lg-banner-ico{width:34px;height:34px;border-radius:50%;background:var(--ok);display:grid;place-items:center;flex-shrink:0}
+.lg-banner-ico svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.lg-banner-txt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.lg-banner-txt strong{font-size:15px;color:#14532d;font-weight:700}
+.lg-banner-txt span{font-size:13px;color:#2f5d44}
+.lg-banner-x{background:none;border:0;color:#2f5d44;font-size:24px;line-height:1;padding:2px 6px;border-radius:6px;transition:background .2s}
+.lg-banner-x:hover{background:rgba(46,139,87,.15)}
+
+/* password strength meter (sign up) */
+.lg-strength{display:none;align-items:center;gap:10px;margin:-8px 0 14px;font-size:13px;font-weight:600}
+.lg-strength.on{display:flex}
+.lg-strength-bars{display:flex;gap:4px;flex:0 0 96px}
+.lg-strength-bars i{flex:1;height:6px;border-radius:4px;background:#e3e7e4;transition:background .25s}
+.lg-strength.weak .lg-strength-bars i:nth-child(-n+1){background:var(--bad)}
+.lg-strength.medium .lg-strength-bars i:nth-child(-n+2){background:var(--warn)}
+.lg-strength.strong .lg-strength-bars i{background:var(--ok)}
+.lg-strength.weak .lg-strength-txt{color:var(--bad)}
+.lg-strength.medium .lg-strength-txt{color:var(--warn)}
+.lg-strength.strong .lg-strength-txt{color:var(--ok)}
+.lg-strength-txt{line-height:1.3}

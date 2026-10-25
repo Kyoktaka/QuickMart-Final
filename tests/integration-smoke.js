@@ -32,23 +32,22 @@ for(const p of pages){
 // not in a subtitle below a single-line input. Asset versioning avoids stale JS.
 const inventoryHtml=fs.readFileSync(path.join(root,'manager/inventory.html'),'utf8');
 const inventoryJs=fs.readFileSync(path.join(root,'js/inventory.js'),'utf8');
-assert(inventoryHtml.includes('<textarea id="epc-code"'),'EPC entry must be multiline');
+assert(inventoryHtml.includes('id="epc-list"'),'Scanned EPCs must be listed with a Remove button each');
 assert(!inventoryHtml.includes('<input id="epc-code"'),'Old single-line EPC box must be absent');
-assert(inventoryHtml.includes('data-epc-ui="scan-only-v4"'),'EPC UI version marker missing');
-assert(inventoryHtml.includes('inventory.js?v=epc-scan-only-v4'),'Inventory JS must be cache-busted');
-assert(inventoryHtml.includes('inventory.css?v=epc-scan-only-v4'),'Inventory CSS must be cache-busted');
+assert(inventoryHtml.includes('data-epc-ui="scan-remove-v5"'),'EPC UI version marker missing');
+assert(inventoryHtml.includes('inventory.js?v=integration-20261025'),'Integrated Inventory JS must be cache-busted');
+assert(inventoryHtml.includes('inventory.css?v=scan-remove-v5'),'Inventory CSS must be cache-busted');
 assert(!inventoryHtml.includes('No EPCs captured yet.'),'Do not show an extra subtitle below EPC list');
 assert(!inventoryJs.includes("unique EPC'+"),'Old EPC subtitle output must never reappear');
-assert(/<textarea\b[^>]*id="epc-code"[^>]*\breadonly\b/.test(inventoryHtml),
-  'EPC textarea must remain read-only even before JS loads');
+assert(!/<(textarea|input)\b[^>]*id="epc-(code|list)"/.test(inventoryHtml),
+  'EPC list must never be a typeable field');
 assert(!/paste or type/i.test(inventoryHtml),
   'EPC display must not invite manual typing or pasting');
 assert(!inventoryJs.includes('importEpcEditor')&&!inventoryJs.includes('parseEpcEditor'),
   'EPC registration must never read manually edited textarea contents');
-assert(inventoryJs.includes("field.readOnly=true"),
-  'Scan display must never unlock after Stop Scanning');
-assert(inventoryJs.includes("field.value=[...pendingEpcs].join('\\n')"),
-  'All scanned EPCs must populate the multiline box, one per line');
+assert(inventoryJs.includes('data-epc-remove')&&inventoryJs.includes('[...pendingEpcs]'),
+  'Every scanned EPC is listed with its own Remove button');
+assert(!inventoryJs.includes('badge">${tags.length} EPC'),'The "0 EPC" badge must be gone from product rows');
 
 const legacy=fs.readFileSync(path.join(root,'manager/reset-password.html'),'utf8');
 assert(legacy.includes("const target='login.html'+"));
@@ -56,7 +55,7 @@ const mail=fs.readFileSync(path.join(root,'api/auth/forgot-password.php'),'utf8'
 assert(mail.includes("'/manager/login.html?reset_token='"));
 const adapter=fs.readFileSync(path.join(root,'js/backend.js'),'utf8');
 for(const ep of ['api/auth/login.php','api/auth/signup.php','api/auth/forgot-password.php',
- 'api/auth/reset-password.php','api/rfid/detect.php','api/rfid/register.php',
+ 'api/auth/reset-password.php','api/rfid/detect.php','api/rfid/register.php','api/rfid/authorize-restock.php',
  'api/checkout/process.php','api/transactions/list.php','api/rfid/list.php'])
  assert(adapter.includes(ep),'API endpoint missing '+ep);
 assert(!adapter.includes('DEMO_MODE'));

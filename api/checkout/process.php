@@ -1,177 +1,80 @@
 <?php
 declare(strict_types=1);
-
 require_once __DIR__ . '/../../config/bootstrap.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/demo-qr.php';
+require_once __DIR__ . '/../../includes/checkout.php';
 
 require_scan_authorized();
 require_post();
-
 // Local classroom simulation is enabled automatically ONLY on the XAMPP
 // loopback host. Production and LAN requests always fail closed.
-$demoEnabled = quickmart_local_demo_allowed(
-    (string)($_SERVER['REMOTE_ADDR'] ?? ''),
-    (string)($_SERVER['HTTP_HOST'] ?? ''),
-    getenv('QUICKMART_APP_ENV'),
-    getenv('QUICKMART_DEMO_CHECKOUT')
-);
-if (!$demoEnabled) {
-    json_response([
-        'success' => false,
-        'message' => 'Classroom QR checkout is available on localhost only. No real payment provider is connected.'
-    ], 503);
+if (!quickmart_local_demo_allowed((string) ($_SERVER['REMOTE_ADDR'] ?? ''), (string) ($_SERVER['HTTP_HOST'] ?? ''), getenv('QUICKMART_APP_ENV'), getenv('QUICKMART_DEMO_CHECKOUT'))) {
+    json_response(['success' => false, 'message' => 'Classroom QR checkout is available on localhost only. No real payment provider is connected.'], 503);
 }
-
 $data = read_json_body();
-// Only two classroom QR fixtures are recognized. QR text is not real payment proof.
-$demoQr = is_string($data['payment_qr'] ?? null) ? $data['payment_qr'] : '';
-$demoOutcome = quickmart_demo_qr_outcome($demoQr);
-if ($demoOutcome === 'invalid') {
-    json_response([
-        'success' => false,
-        'code' => 'INVALID_DEMO_QR',
-        'message' => 'Unrecognized QuickMart demo QR code.'
-    ], 422);
-}
-$sessionId = $data['session_id'] ?? null;
-$input = $data['epcs'] ?? null;
-
-if (!is_string($sessionId) || !preg_match('/^[A-Za-z0-9_-]{1,50}$/D', $sessionId)) {
-    json_response(['success' => false, 'message' => 'Valid session_id is required.'], 422);
-}
-if (!is_array($input) || !$input || count($input) > 100) {
-    json_response(['success' => false, 'message' => 'Provide 1 to 100 EPCs.'], 422);
-}
-
-$unique = [];
-foreach ($input as $value) {
-    if (!is_string($value)) {
-        json_response(['success' => false, 'message' => 'Every EPC must be a string.'], 422);
-    }
-    $epc = strtoupper(preg_replace('/\s+/', '', trim($value)));
-    if ($epc === '' || strlen($epc) > 100 || !preg_match('/^[A-Z0-9:_-]+$/D', $epc)) {
-        json_response(['success' => false, 'message' => 'One or more EPCs are invalid.'], 422);
-    }
-    $unique[$epc] = true;
-}
-$epcs = array_keys($unique);
-
-// This is a fixed classroom scenario, not a real wallet balance check.
-// A declined demo QR cannot create a successful purchase or update any RFID tag.
-// The frontend records the failed attempt separately through api/checkout/log.php.
-if ($demoOutcome === 'insufficient_balance') {
-    json_response([
-        'success' => false,
-        'code' => 'DEMO_INSUFFICIENT_BALANCE',
-        'message' => 'Insufficient balance (simulated wallet).'
-    ], 422);
-}
-
 try {
+    $id = checkout_session_id($data['session_id'] ?? null);
+    $attemptId = $data['attempt_id'] ?? null;
+    if (!is_string($attemptId) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $attemptId)) throw new CheckoutError('A stable attempt_id is required for payment retries.', 'INVALID_ATTEMPT', 422);
+    // Previous contract, superseded by the offline fixtures and durable attempt service below:
+    // Only two classroom QR fixtures are recognized. QR text is not real payment proof.
+    // The frontend records the failed attempt separately through api/checkout/log.php.
+    $qr = is_string($data['payment_qr'] ?? null) ? $data['payment_qr'] : '';
+    if (strlen($qr) > 1000) throw new CheckoutError('QR payload is too long.', 'INVALID_QR', 422);
     $conn->beginTransaction();
-
-    $sessionStmt = $conn->prepare(
-        'SELECT purchase_id FROM PURCHASEtbl WHERE session_id = :session_id LIMIT 1 FOR UPDATE'
-    );
-    $sessionStmt->execute(['session_id' => $sessionId]);
-    if ($sessionStmt->fetch()) {
-        throw new DomainException('Session ID has already been used. Check transaction history.');
+    $row = checkout_row($conn, $id, checkout_owner());
+    checkout_expire($conn, $row);
+    if ($row['status'] === 'SUCCESSFUL') {
+        $conn->commit();
+        json_response(['success' => true, 'result' => 'success', 'message' => 'Demo checkout already completed. No real payment was verified.', 'purchase' => checkout_receipt($row), 'session' => checkout_snapshot($row)]);
     }
-
-    $placeholders = implode(',', array_fill(0, count($epcs), '?'));
-    $lookup = $conn->prepare(
-        'SELECT r.tag_id, r.epc, r.product_id, r.status AS tag_status, '
-        . 'p.status AS product_status, p.unit_price '
-        . 'FROM RFID_tags AS r '
-        . 'INNER JOIN PRODUCTtbl AS p ON p.product_id = r.product_id '
-        . 'WHERE r.epc IN (' . $placeholders . ') '
-        . 'ORDER BY r.tag_id FOR UPDATE'
-    );
-    $lookup->execute($epcs);
-    $rows = $lookup->fetchAll();
-    $byEpc = [];
-    foreach ($rows as $row) {
-        $byEpc[$row['epc']] = $row;
+    if ($row['status'] === 'VOIDED') {
+        $conn->commit();
+        json_response(['success' => false, 'code' => 'CHECKOUT_VOIDED', 'message' => 'Checkout voided: ' . $row['reason'] . '.', 'session' => checkout_snapshot($row)], 409);
     }
-
-    $items = [];
-    $totalCents = 0;
-    foreach ($epcs as $epc) {
-        $row = $byEpc[$epc] ?? null;
-        if (!$row || $row['tag_status'] !== 'AVAILABLE' || (int) $row['product_status'] !== 1) {
-            throw new DomainException('A scanned item is unavailable, unregistered, or already purchased. Please rescan.');
-        }
-        $price = (string) $row['unit_price'];
-        $cents = (int) round((float) $price * 100);
-        $totalCents += $cents;
-        $items[] = [
-            'tag_id' => (int) $row['tag_id'],
-            'product_id' => (int) $row['product_id'],
-            'price' => $price,
-        ];
+    $replay = $conn->prepare('SELECT response_json FROM CHECKOUT_attempts WHERE session_id=? AND attempt_id=?');
+    $replay->execute([$id, $attemptId]);
+    if ($stored = $replay->fetchColumn()) {
+        $payload = json_decode($stored, true, 512, JSON_THROW_ON_ERROR);
+        // Replay the outcome, with current session state so an old response cannot reset the UI counter.
+        $payload['session'] = checkout_snapshot($row);
+        $conn->commit();
+        json_response($payload, 422);
     }
-    if ($totalCents > 9999999999) {
-        throw new DomainException('Purchase total exceeds the supported limit.');
+    if ($row['status'] !== 'PAYMENT') throw new CheckoutError('Confirm the reviewed cart before payment.', 'CART_REVIEW_REQUIRED');
+    $outcome = quickmart_demo_qr_outcome($qr);
+    // This is a fixed classroom scenario, not a real wallet balance check.
+    // A declined demo QR cannot create a successful purchase or update any RFID tag.
+    if ($outcome !== 'success') {
+        $row['failed_attempts']++;
+        $conn->prepare('UPDATE CHECKOUT_sessions SET failed_attempts=? WHERE session_id=?')->execute([$row['failed_attempts'], $id]);
+        if ($row['failed_attempts'] >= CHECKOUT_MAX_FAILURES) checkout_void($conn, $row, 'three_failed_attempts');
+        [$code, $message] = match ($outcome) {
+            'insufficient_balance' => ['DEMO_INSUFFICIENT_BALANCE', 'Insufficient balance (simulated wallet).'],
+            'no_internet' => ['DEMO_NO_INTERNET', 'No internet connection (simulated).'],
+            default => ['INVALID_DEMO_QR', 'Unrecognized QuickMart demo QR code.'],
+        };
+        $payload = ['success' => false, 'code' => $code, 'message' => $message, 'session' => checkout_snapshot($row)];
+        $conn->prepare('INSERT INTO CHECKOUT_attempts (session_id,attempt_id,outcome,response_json) VALUES (?,?,?,?)')->execute([$id, $attemptId, $outcome, json_encode($payload, JSON_THROW_ON_ERROR)]);
+        $conn->commit();
+        json_response($payload, 422);
     }
-    $total = number_format($totalCents / 100, 2, '.', '');
-
-    $insertPurchase = $conn->prepare(
-        "INSERT INTO PURCHASEtbl (admin_id, session_id, status, attempted_items, total_amount) "
-        . "VALUES (:admin_id, :session_id, 'SUCCESSFUL', :attempted_items, :total_amount)"
-    );
-    $insertPurchase->execute([
-        'admin_id' => (int) $_SESSION['manager_id'],
-        'session_id' => $sessionId,
-        'attempted_items' => count($items),
-        'total_amount' => $total,
-    ]);
-    $purchaseId = (int) $conn->lastInsertId();
-
-    $insertItem = $conn->prepare(
-        'INSERT INTO PURCHASE_items (purchase_id, product_id, tag_id, unit_price, subtotal) '
-        . 'VALUES (:purchase_id, :product_id, :tag_id, :unit_price, :subtotal)'
-    );
-    $markTag = $conn->prepare(
-        "UPDATE RFID_tags SET status = 'PURCHASED', purchased_at = NOW() "
-        . "WHERE tag_id = :tag_id AND status = 'AVAILABLE'"
-    );
-    foreach ($items as $item) {
-        $insertItem->execute([
-            'purchase_id' => $purchaseId,
-            'product_id' => $item['product_id'],
-            'tag_id' => $item['tag_id'],
-            'unit_price' => $item['price'],
-            'subtotal' => $item['price'],
-        ]);
-        $markTag->execute(['tag_id' => $item['tag_id']]);
-        if ($markTag->rowCount() !== 1) {
-            throw new DomainException('An RFID tag changed status during checkout. Please retry with a new session.');
-        }
+    $catalog = checkout_catalog($conn, json_decode($row['epcs_json'], true, 512, JSON_THROW_ON_ERROR));
+    if ($catalog['total'] !== $row['total_amount'] || json_encode($catalog['cart'], JSON_THROW_ON_ERROR) !== $row['cart_json']) throw new CheckoutError('Product information changed. Review your cart again.', 'CART_CHANGED');
+    $conn->prepare("INSERT INTO PURCHASEtbl (admin_id,session_id,status,attempted_items,total_amount) VALUES (?,?,'SUCCESSFUL',?,?)")->execute([$row['admin_id'], $id, $row['total_items'], $row['total_amount']]);
+    $row['purchase_id'] = (int) $conn->lastInsertId();
+    $insertItem = $conn->prepare('INSERT INTO PURCHASE_items (purchase_id,product_id,tag_id,unit_price,subtotal) VALUES (?,?,?,?,?)');
+    $markTag = $conn->prepare("UPDATE RFID_tags SET status='PURCHASED',purchased_at=NOW() WHERE tag_id=? AND status='AVAILABLE'");
+    foreach ($catalog['items'] as $item) {
+        $insertItem->execute([$row['purchase_id'], $item['product_id'], $item['tag_id'], $item['price'], $item['price']]);
+        $markTag->execute([$item['tag_id']]);
+        if ($markTag->rowCount() !== 1) throw new CheckoutError('An RFID tag changed status during checkout. Please review the cart.', 'CART_UNAVAILABLE');
     }
-
+    $row['status'] = 'SUCCESSFUL';
+    $conn->prepare("UPDATE CHECKOUT_sessions SET status='SUCCESSFUL',purchase_id=? WHERE session_id=?")->execute([$row['purchase_id'], $id]);
+    $payload = ['success' => true, 'result' => 'success', 'message' => 'Demo checkout completed. No real payment was verified.', 'purchase' => checkout_receipt($row), 'session' => checkout_snapshot($row)];
+    $conn->prepare('INSERT INTO CHECKOUT_attempts (session_id,attempt_id,outcome,response_json) VALUES (?,?,?,?)')->execute([$id, $attemptId, 'success', json_encode($payload, JSON_THROW_ON_ERROR)]);
     $conn->commit();
-    json_response([
-        'success' => true,
-        'message' => 'Demo checkout completed. No real payment was verified.',
-        'demo_mode' => true,
-        'demo_wallet' => 'QM-WALLET-1001',
-        'session_id' => $sessionId,
-        'purchase_id' => $purchaseId,
-        'total_items' => count($items),
-        'total_amount' => (float) $total,
-    ]);
-} catch (DomainException $e) {
-    if ($conn->inTransaction()) $conn->rollBack();
-    json_response(['success' => false, 'message' => $e->getMessage()], 409);
-} catch (PDOException $e) {
-    if ($conn->inTransaction()) $conn->rollBack();
-    error_log('QuickMart checkout database error: ' . get_class($e));
-    $status = (string) $e->getCode() === '23000' ? 409 : 500;
-    json_response(['success' => false, 'message' =>
-        $status === 409 ? 'Session or item already processed. Review transaction history.' : 'Could not complete checkout.'], $status);
-} catch (Throwable $e) {
-    if ($conn->inTransaction()) $conn->rollBack();
-    error_log('QuickMart checkout error: ' . get_class($e));
-    json_response(['success' => false, 'message' => 'Could not complete checkout.'], 500);
-}
+    json_response($payload);
+} catch (Throwable $error) { checkout_failure_response($conn, $error); }

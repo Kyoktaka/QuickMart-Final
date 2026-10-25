@@ -14,7 +14,6 @@
 .hfilter.has-filter .fdot{display:inline-block;animation:pulseGlow 2s infinite}
 
 .tx-card{background:#fff;border:1px solid #e2e8e3;border-radius:14px;box-shadow:0 3px 14px rgba(24,49,42,.045);padding:0;overflow:auto;animation:fadeInUp .5s ease}
-.tx-scroll{max-height:390px;overflow:auto;overscroll-behavior:contain}
 .tx-card table{border:0;border-radius:0;min-width:760px}
 .tx-card th{position:sticky;top:0;z-index:2;background:#f4f7f4;color:#526157;border-bottom:1px solid #e1e8e2;text-transform:uppercase;letter-spacing:.045em;font-size:.73rem;font-weight:800;padding:15px 13px}
 .tx-card td{padding:13px;font-size:.84rem;border-top:1px solid #edf1ed}
@@ -26,8 +25,3 @@
 #tab-history .badge::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
 .tx-foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:8px;padding:12px 4px 0;animation:fadeInUp .55s ease}
 .tx-foot span{color:#718078;font-size:.82rem}
-.pg{display:flex;gap:4px}
-.pg button{color:var(--primary-orange);background:none;border:0;font-weight:700;font-size:13px;width:28px;height:28px;border-radius:6px;transition:var(--transition)}
-.pg button:hover:not(:disabled){background:#FFE8D9;transform:translateY(-2px)}
-.pg button.cur{background:#FFE8D9}
-.pg button:disabled{opacity:.35;cursor:default}

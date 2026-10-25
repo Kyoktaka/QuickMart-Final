@@ -8,15 +8,15 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <link rel="stylesheet" href="../css/base.css">
 <link rel="stylesheet" href="../css/animations.css">
-<link rel="stylesheet" href="../css/layout.css">
-<link rel="stylesheet" href="../css/components.css">
-<link rel="stylesheet" href="../css/modals.css">
-<link rel="stylesheet" href="../css/kiosk.css">
+<link rel="stylesheet" href="../css/layout.css?v=update-v3">
+<link rel="stylesheet" href="../css/components.css?v=update-v3">
+<link rel="stylesheet" href="../css/modals.css?v=cart-latch-v1&u=3">
+<link rel="stylesheet" href="../css/kiosk.css?v=cart-latch-v1">
 <link rel="stylesheet" href="../css/toast.css">
 <link rel="stylesheet" href="../css/camera.css">
-<link rel="stylesheet" href="../css/responsive.css">
+<link rel="stylesheet" href="../css/responsive.css?v=update-v3">
 <link rel="stylesheet" href="../css/kiosk-welcome.css">
-<script src="../js/guard.js" data-require-kiosk></script>
+<script src="../js/guard.js?v=integration-20261025" data-require-kiosk></script>
 </head>
 <body>
 
@@ -42,14 +42,14 @@
     <div class="cart-main">
       <div class="cart-table-card">
         <table>
-          <colgroup><col style="width:7%"><col style="width:27%"><col style="width:29%"><col style="width:13%"><col style="width:9%"><col style="width:15%"></colgroup>
-          <thead><tr><th>#</th><th>Product</th><th>Product ID</th><th>Price</th><th>Qty</th><th>Total</th></tr></thead>
+          <colgroup><col style="width:6%"><col style="width:24%"><col style="width:24%"><col style="width:12%"><col style="width:8%"><col style="width:13%"><col style="width:13%"></colgroup>
+          <thead><tr><th>#</th><th>Product</th><th>Product ID</th><th>Price</th><th>Qty</th><th>Total</th><th>Remove</th></tr></thead>
           <tbody id="cart-body"></tbody>
         </table>
       </div>
       <div class="cart-total"><span class="lbl">TOTAL · <span id="sum-items">0</span> items</span><span class="amt2" id="sum-total">₱0.00</span><span id="sum-tax" hidden>₱0.00</span></div>
       <div class="cart-actions">
-        <button class="cbtn confirm" id="btn-checkout" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5l5.5 5.5L20.5 6.5"/></svg>Confirm Checkout</button>
+        <button class="cbtn confirm" id="btn-checkout" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5l5.5 5.5L20.5 6.5"/></svg>Checkout</button>
         <button class="cbtn outline" id="btn-input-tag-toggle" type="button">INPUT TAG</button>
         <button class="cbtn outline" id="btn-cancel" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>Cancel Order</button>
       </div>
@@ -91,6 +91,38 @@
   <button class="tag-confirm" id="tag-modal-confirm" type="button">Confirm</button>
 </div></div>
 
+<!-- KIOSK: CHECK YOUR CART (customer decides here before the QR payment screen) -->
+<div class="modal" id="m-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><div class="mbox">
+  <h2 id="confirm-title">Check your cart</h2>
+  <div class="cc-scroll"><table class="cc-table">
+    <colgroup><col style="width:6%"><col style="width:27%"><col style="width:31%"><col style="width:13%"><col style="width:8%"><col style="width:15%"></colgroup>
+    <thead><tr><th>#</th><th>Product</th><th>Product ID</th><th>Price</th><th>Qty</th><th>Total</th></tr></thead>
+    <tbody id="confirm-body"></tbody>
+  </table></div>
+  <div class="cc-total"><span>TOTAL · <span id="confirm-items">0</span> items</span><b id="confirm-total">₱0.00</b></div>
+  <div class="cc-actions">
+    <button class="cc-back" id="confirm-back" type="button">Back to cart</button>
+    <button class="cc-ok" id="confirm-ok" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5l5.5 5.5L20.5 6.5"/></svg>Confirm Checkout</button>
+  </div>
+</div></div>
+
+<!-- KIOSK: REMOVE ITEM POPUP -->
+<div class="modal" id="m-remove" role="dialog" aria-modal="true" aria-labelledby="rm-title"><div class="mbox">
+  <h2 id="rm-title">Remove from cart?</h2>
+  <p class="rm-name" id="rm-name">Product</p>
+  <p class="rm-sub" id="rm-sub">Quantity in cart: 1</p>
+  <div class="rm-stepper" id="rm-stepper" hidden>
+    <button type="button" id="rm-minus" aria-label="Remove fewer">&minus;</button>
+    <span id="rm-count" aria-live="polite">1</span>
+    <button type="button" id="rm-plus" aria-label="Remove more">+</button>
+  </div>
+  <p class="rm-note">Please take the item off the reader so it is not scanned again.</p>
+  <div class="cc-actions">
+    <button class="cc-back" id="rm-keep" type="button">Keep item</button>
+    <button class="cc-del" id="rm-confirm" type="button">Remove</button>
+  </div>
+</div></div>
+
 <!-- KIOSK: PRODUCT BLOCKED POPUP -->
 <div class="modal" id="m-blocked" role="alertdialog" aria-modal="true" aria-labelledby="blk-title"><div class="mbox">
   <div class="blk-bar"></div>
@@ -112,7 +144,7 @@
     <button class="btn" id="btn-mk" style="width:100%">Authorize</button>
     <button class="link" id="btn-forgot">Reset or change password</button></div>
   <div class="astep" id="as4"><h3>Reset Password</h3><p class="sub">Enter your registered Gmail address to receive reset instructions.</p>
-    <div class="fg" style="margin-top:14px;text-align:left"><label>Gmail address</label><input type="email" id="rs-gmail" placeholder="e.g. manager@gmail.com" autocomplete="off" style="text-align:left"></div>
+    <div class="fg" style="margin-top:14px;text-align:left"><label>Gmail address</label><input type="email" id="rs-gmail" placeholder="abcdefgh@gmail.com" autocomplete="off" style="text-align:left"></div>
     <div class="err" id="e4"></div>
     <button class="btn" id="btn-gmail-received" style="width:100%">Send reset link</button></div>
   <div class="astep" id="as5"><h3>Set New Password</h3><p class="sub">Please enter your new password below.</p>
@@ -131,15 +163,16 @@
 </div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="../js/storage.js"></script>
-<script src="../js/state.js"></script>
-<script src="../js/backend.js"></script>
-<script src="../js/helpers.js"></script>
-<script src="../js/auth.js"></script>
-<script src="../js/qr-payment.js"></script>
-<script src="../js/camera-scanner.js"></script>
-<script src="../assets/js/rfid-scanner.js"></script>
-<script src="../js/kiosk.js"></script>
-<script src="../js/main.js"></script>
+<script src="../js/storage.js?v=integration-20261025"></script>
+<script src="../js/state.js?v=integration-20261025"></script>
+<script src="../js/backend.js?v=integration-20261025"></script>
+<script src="../js/helpers.js?v=integration-20261025"></script>
+<script src="../js/password-guard.js?v=integration-20261025"></script>
+<script src="../js/auth.js?v=integration-20261025"></script>
+<script src="../js/qr-payment.js?v=integration-20261025"></script>
+<script src="../js/camera-scanner.js?v=integration-20261025"></script>
+<script src="../assets/js/rfid-scanner.js?v=integration-20261025"></script>
+<script src="../js/kiosk.js?v=integration-20261025"></script>
+<script src="../js/main.js?v=integration-20261025"></script>
 </body>
 </html>

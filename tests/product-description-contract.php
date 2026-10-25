@@ -14,9 +14,10 @@ if (strpos($schema, 'description TEXT NULL') === false
     fwrite(STDERR, "Schema does not follow description-only product contract.\n");
     exit(1);
 }
-foreach (['Zonrox Color Safe Bleach' => 'Blossom Fresh Scent (225 ml)',
+foreach (['Alcohol Dispenser' => 'Compact and Refillable (20g)',
+          'Focus Refillable Fillers' => 'Lighweight Pulp Paper (55gsm)',
           'Dumpling Squishy' => 'Fun and Relaxing (160g)',
-          'Argentina Giniling' => 'Ground Pork Mix (250g)'] as $name => $description) {
+          'Urban Tee Shirt' => 'Breathable Blue (F-Medium)'] as $name => $description) {
     if (!str_contains($schema, "'$name', '$description'")) {
         fwrite(STDERR, "Default description missing for $name.\n");
         exit(1);

@@ -1,2 +1,10 @@
 vendor/
 .env
+.env.local
+__pycache__/
+*.py[cod]
+rfid-bridge/build/
+rfid-bridge/dist/
+rfid-bridge/*.spec
+*.log
+*.sql.gz

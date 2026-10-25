@@ -2,10 +2,9 @@
 @media(max-width:900px){
   .sidebar{width:72px;padding:0 6px 14px}
   .brand{display:flex;justify-content:center;padding:24px 0;font-size:1.35rem}
-  .nl,.bn,.sidebar .user>div:last-child{display:none}
+  .nl,.bn{display:none}
   #nav a,.logout-btn{justify-content:center;padding:12px 0}
-  .sidebar .user{justify-content:center}
-  .tab{padding:18px}
+  .tab{padding:12px 18px 18px}
   .grid2{grid-template-columns:1fr}
   .inv-actions{flex-wrap:wrap}
 }

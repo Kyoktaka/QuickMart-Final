@@ -1,28 +1,42 @@
-name: QuickMart syntax checks
+name: QuickMart automated checks
 on:
   push:
   pull_request:
 jobs:
-  lint:
+  integration:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: quickmart_ci_only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pquickmart_ci_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      QUICKMART_TEST_DSN: mysql:host=127.0.0.1;port=3306;charset=utf8mb4
+      QUICKMART_TEST_USER: root
+      QUICKMART_TEST_PASSWORD: quickmart_ci_only
     steps:
       - uses: actions/checkout@v4
-      - name: PHP syntax
-        run: find api config includes manager -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-      - name: Frontend JavaScript syntax
-        run: |
-          find js assets/js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Validate two fixed demo QR outcomes
-        run: php tests/demo-qr.php
-      - name: Product description/schema contract
-        run: php tests/product-description-contract.php
-      - name: Preserve manual keyboard and RFID scanning focus
-        run: node tests/manual-keyboard.js
-      - name: RFID presence and scan regression tests
-        run: node tests/rfid-scanner.js
-      - name: Multi-tag restocking and product isolation tests
-        run: node tests/inventory-batch.js
-      - name: RFID kiosk twenty-tag and removal tests
-        run: node tests/kiosk-presence.js
-      - name: Final frontend integration smoke tests
-        run: node tests/integration-smoke.js
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, mbstring
+          tools: composer:v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install locked PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Validate dependency configuration
+        run: composer validate --no-check-publish
+      - name: Syntax, scanner, keyboard, cart, recovery, bridge, authentication and real MySQL checks
+        run: python tools/check.py --database

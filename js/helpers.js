@@ -21,7 +21,10 @@ function animateNumber(el,to,format=v=>String(Math.round(v))){
   (function step(now){const k=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-k,3);el.textContent=format(from+(to-from)*e);if(k<1)requestAnimationFrame(step)})(t0);
 }
 
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){['m-product','m-epc'].forEach(closeModal)}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){
+  // The manager-password popup sits on top of the EPC popup: Escape cancels only that one.
+  if($('#m-restock-auth')?.classList.contains('on')){$('#restock-auth-cancel')?.click();return}
+  ['m-product','m-epc','m-logout'].forEach(closeModal)}});
 
 const codeFor=id=>'PRD-'+String(id).padStart(4,'0');
 
@@ -33,11 +36,31 @@ document.addEventListener('click',()=>$$('.pop').forEach(p=>p.classList.remove('
 /* password show/hide eye */
 const EYE_OPEN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',EYE_CLOSED='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10c2.8 3.9 5.9 5.5 9 5.5s6.2-1.6 9-5.5"/><path d="M6.4 13.6l-1.8 2.4M10.2 15.1l-.7 2.8M13.8 15.1l.7 2.8M17.6 13.6l1.8 2.4"/></svg>';
 
-/* sign out (sidebar button) */
+/* sign out (sidebar button) - always asks for confirmation first */
 async function logout(){
   try{await Backend.revokeScan()}catch(e){}
-  try{await Backend.logout()}catch(e){toast(e.message,'error');return}
-  sessionStorage.removeItem(SS_AUTH);sessionStorage.removeItem(SS_KIOSK);location.replace('login.html');
+  try{await Backend.logout()}catch(e){toast(e.message,'error');return false}
+  sessionStorage.removeItem(SS_AUTH);sessionStorage.removeItem(SS_KIOSK);location.replace('login.html');return true;
+}
+function confirmLogout(){
+  let m=$('#m-logout');
+  if(!m){
+    m=document.createElement('div');m.className='modal';m.id='m-logout';
+    m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');m.setAttribute('aria-labelledby','logout-title');m.setAttribute('aria-describedby','logout-desc');
+    m.innerHTML='<div class="mbox"><div class="lo-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></div>'
+      +'<h2 id="logout-title">Log out?</h2><p class="d" id="logout-desc">Are you sure you want to log out of QuickMart?</p>'
+      +'<div class="mfoot"><button type="button" class="btn ghost" id="logout-cancel">Cancel</button><button type="button" class="btn" id="logout-ok">Yes, Log out</button></div></div>';
+    document.body.appendChild(m);
+    m.addEventListener('click',e=>{if(e.target===m&&!m.dataset.busy)closeModal('m-logout')});
+    $('#logout-cancel').onclick=()=>closeModal('m-logout');
+    $('#logout-ok').onclick=async()=>{
+      const ok=$('#logout-ok'),cancel=$('#logout-cancel');
+      m.dataset.busy='1';ok.disabled=cancel.disabled=true;
+      const done=await logout();
+      if(!done){delete m.dataset.busy;ok.disabled=cancel.disabled=false}
+    };
+  }
+  openModal('m-logout');setTimeout(()=>$('#logout-cancel')?.focus(),60);
 }
 
 function installPasswordEyes(){

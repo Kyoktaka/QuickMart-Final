@@ -5,6 +5,8 @@ require_once __DIR__ . '/../../config/bootstrap.php';
 
 require_manager();
 require_post();
+// Registering EPC tags needs a manager password approval (api/rfid/authorize-restock.php).
+require_restock_authorized();
 
 $data = read_json_body();
 $productId = filter_var(
@@ -60,6 +62,9 @@ try {
     if ((int) $product['status'] !== 1) {
         json_response(['success' => false, 'message' => 'The selected product is inactive.'], 409);
     }
+
+    // The approval is single-use: the next registration asks for the password again.
+    unset($_SESSION['restock_authorized_at']);
 
     // The unique EPC constraint prevents two concurrent requests from assigning one tag twice.
     // Commit each tag separately so one duplicate cannot discard an entire registration batch.

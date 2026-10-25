@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../config/bootstrap.php';
 require_once __DIR__ . '/../../config/database.php';
-require_manager();
+require_manager(true);
+session_write_close(); // read-only: free the session lock
 
 // Inventory can request inactive rows; standard callers still receive active products.
 $includeInactive = ($_GET['include_inactive'] ?? '') === '1';

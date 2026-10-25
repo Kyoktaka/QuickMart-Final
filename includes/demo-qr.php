@@ -7,13 +7,21 @@ declare(strict_types=1);
  * No wallet accounts, balances, transfers, or real payment verification exist.
  * QR strings are public sample data; they are NOT secure payment credentials.
  *
- * @return 'success'|'insufficient_balance'|'invalid'
+ * @return 'success'|'insufficient_balance'|'no_internet'|'invalid'
  */
 function quickmart_demo_qr_outcome(string $payload): string
 {
     return match (trim($payload)) {
-        'QMPAY|QM-WALLET-1001|C899' => 'success',
-        'QMPAY|QM-WALLET-1002|C900' => 'insufficient_balance',
+        // Original QuickMart classroom fixtures.
+        'QMPAY|QM-WALLET-1001|C899',
+        // Offline QR fixture distributed with the QuickMart demo package.
+        'QUICKMART-DEMO|PAYMENT_SUCCESS|OFFLINE-V1' => 'success',
+
+        'QMPAY|QM-WALLET-1002|C900',
+        'QUICKMART-DEMO|NO_BALANCE|OFFLINE-V1' => 'insufficient_balance',
+
+        'QUICKMART-DEMO|NO_INTERNET|OFFLINE-V1' => 'no_internet',
+
         default => 'invalid',
     };
 }
