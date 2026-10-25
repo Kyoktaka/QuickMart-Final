@@ -194,6 +194,7 @@
   }
   document.addEventListener('keydown',event=>{
     if(!enabled||event.ctrlKey||event.altKey||event.metaKey)return;
+    if(event.key==='Shift'||event.key==='CapsLock')return;
     // Normal physical keyboard input into editable fields must pass through
     // (js/password-guard.js discards recognized fast hexadecimal EPC bursts there).
     const active=document.activeElement;
@@ -212,9 +213,15 @@
       else if(now-lastFlushAt<=CLOSING_ENTER_MS){event.preventDefault();event.stopPropagation()}
       return;
     }
-    if(event.key.length!==1||!/^[A-Za-z0-9:_-]$/.test(event.key))return;
+    let key=event.key;
+    if(typeof key!=='string'||key.length!==1)return;
+    // The same physical reader keys must produce the same EPC while a person
+    // holds Shift or toggles Caps Lock. Ordinary editable fields bypass this
+    // capture handler above and retain their actual characters.
+    if(/^(?:Digit[0-9]|Key[A-F])$/.test(event.code||''))key=event.code.slice(-1);
+    if(!/^[A-Za-z0-9:_-]$/.test(key))return;
     if(buffer&&!burst)flush();
-    buffer+=event.key;
+    buffer+=key;
     if(buffer.length>MAX_EPC_LENGTH){buffer='';return}
     event.preventDefault();
     armFlush(now);

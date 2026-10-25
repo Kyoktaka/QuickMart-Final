@@ -216,9 +216,9 @@ async function main(){
   click('#btn-idle-tag');
   assert.equal(isOn('m-tag'),true);assert.equal(readerBlocked,true,'Reader blocked while typing an EPC');
   const field=el('#tag-modal-input'),keydown=field.handlers.keydown;
-  function press(key,gapMs){
+  function press(key,gapMs,properties={}){
     now+=gapMs;
-    const ev={key,ctrlKey:false,metaKey:false,altKey:false,repeat:false,defaultPrevented:false,
+    const ev={key,ctrlKey:false,metaKey:false,altKey:false,repeat:false,defaultPrevented:false,...properties,
       preventDefault(){this.defaultPrevented=true}};
     keydown(ev);
     if(!ev.defaultPrevented&&key.length===1)field.value+=key;   // what the browser would do
@@ -241,6 +241,15 @@ async function main(){
   press('Enter',4);
   assert.equal(field.value,'','Standalone Input Tag fallback must keep uppercase Shift transitions inside the rejected reader frame');
   assert.equal(requests.length,calls,'Reader Shift transitions cannot cause a manual lookup');
+  await advance(500);field.value='';
+  for(const [index,c] of [...actualEpc].entries()){
+    if(index===5)press('CapsLock',2);
+    const letter=/[A-F]/.test(c),key=letter?c.toLowerCase():')!@#$%^&*('[Number(c)];
+    press(key,4,{code:letter?'Key'+c:'Digit'+c,shiftKey:true});
+  }
+  press('Enter',4);await advance(0);
+  assert.equal(field.value,'','Standalone Input Tag fallback rejects CapsLock letters and Shift-modified digits');
+  assert.equal(requests.length,calls,'Modifier-distorted reader output cannot trigger a manual lookup');
   // a person typing at a normal pace is untouched, including a fast typist (~90 ms/char)
   await advance(600);
   field.value='';
