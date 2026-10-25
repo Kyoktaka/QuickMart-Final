@@ -148,6 +148,30 @@ for(const text of [EPC,'30142B8A004C2000000463']){
   }
 }
 
+// Throttled readers and Shift transitions push key gaps past 85 ms. The whole
+// tag must still be rejected from a focused password field, with CapsLock on or off.
+for(const useCaps of [false,true]){
+  for(const gap of [90,120,200,230]){
+    const h=setup(),element=h.field('password');
+    if(useCaps)h.toggleCaps(element);
+    h.advance(700);
+    for(const char of EPC){h.advance(gap-8);h.readerKey(element,char)}
+    const enter=h.press(element,'Enter','Enter',gap);
+    h.advance(800);
+    const label='Slow reader '+gap+'ms, CapsLock '+useCaps;
+    check(element.value,'left REPLACE right',label+': no tag text remains in the field');
+    check(enter.defaultPrevented,true,label+': closing Enter cannot submit');
+  }
+}
+// A 12-character hexadecimal password typed at normal speed is not a reader frame.
+{
+  const h=setup(),element=h.field('password');
+  element.value='';
+  for(const char of 'ab12cd34ef56')h.press(element,char,/\d/.test(char)?'Digit'+char:'Key'+char.toUpperCase(),140);
+  h.advance(100);
+  check(element.value,'ab12cd34ef56','Short hexadecimal password typed by a person survives');
+}
+
 // Ordinary human uppercase letters, CapsLock, Shift and number-row symbols keep
 // their event.key text rather than being rewritten to the physical code value.
 for(const useCaps of [false,true]){

@@ -157,9 +157,13 @@ for(const options of [{},{cancelable:false},{before:false}]){
   for(const key of 'James2026')h.press(element,key,7);
   check(element.value,'manual James2026','Fast ordinary name input remains immediate');
   h.advance(600);
-  for(const key of EPC)h.press(element,key,100);
-  check(element.value,'manual James2026'+EPC,'A person can type a full EPC at normal speed');
+  for(const key of EPC.slice(0,12))h.press(element,key,100);
+  check(element.value,'manual James2026'+EPC.slice(0,12),'A person can type 12 hexadecimal characters at normal speed');
+  h.advance(600);
   check(h.press(element,'Enter',140).defaultPrevented,false,'Deliberate keyboard Enter is preserved');
+  h.advance(600);
+  for(const key of EPC)h.press(element,key,100);
+  check(element.value,'manual James2026'+EPC.slice(0,12),'A 24-character hexadecimal run at reader pace is rejected as a frame');
 }
 
 // A verified independent bridge disables heuristics for physical typing. This

@@ -81,7 +81,7 @@ const onButton=reader(logout,EPC);
 assert.equal(onButton.slice(11).every(Boolean),true,'A recognized EPC burst and its closing Enter are swallowed on a button');
 endBurst();
 const slow=reader(logout,EPC,120);   // even a slow reader
-assert.equal(slow.some(Boolean),false,'Slow reader output cannot be distinguished from physical typing by timing alone');
+assert.equal(slow[slow.length-1],true,'A slow reader frame is recognized after 20 keys and its closing Enter is swallowed');
 endBurst();
 // ...but a person using the keyboard on a button still can.
 assert.equal(press(logout,'Enter',2000),false,'A person pressing Enter on a focused button still works');

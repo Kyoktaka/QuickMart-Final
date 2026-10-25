@@ -19,6 +19,9 @@
   // KEY_GAP_MS: reader-speed detector. BURST_HOLD_GAP_MS: while a burst runs, a key slower than this is a person
   // (so ordinary slower typing resumes even if the reader keeps reading, e.g. a tag lying on the antenna).
   const KEY_GAP_MS=85,CANDIDATE_GAP_MS=240,BURST_HOLD_GAP_MS=340,BURST_KEYS=12,BURST_END_MS=400,ENTER_AFTER_MS=500;
+  // Throttled readers (and Shift transitions) stretch key gaps past KEY_GAP_MS. A hex run this long
+  // at sub-240ms gaps is treated as a reader frame; an EPC is 24 characters.
+  const SLOW_BURST_KEYS=20;
   const SCAN_CHAR=/^[A-Fa-f0-9]$/;
   // Shift/Caps Lock change event.key, including digits into punctuation. Use
   // physical hex positions only for frame recognition; replay the original
@@ -28,8 +31,8 @@
     if(/^(?:Digit[0-9]|Key[A-F])$/.test(e.code||''))return e.code.slice(-1);
     return SCAN_CHAR.test(e.key)?e.key.toUpperCase():'';
   };
-  const NOT_TEXT=new Set(['button','checkbox','radio','submit','reset','file','image','range','color','hidden','password']);
-  let last=0,fast=0,burst=false,timer=null,deadline=0,before='',beforeEl=null,selStart=0,selEnd=0,lastScanKey=-Infinity;
+  const NOT_TEXT=new Set(['button','checkbox','radio','submit','reset','file','image','range','color','hidden']);
+  let last=0,fast=0,slow=0,burst=false,timer=null,deadline=0,before='',beforeEl=null,selStart=0,selEnd=0,lastScanKey=-Infinity;
   let candidateAt=0,candidatePrefix='',closingEnter=false,closingEnterAt=0;
   const insertionSnapshots=new WeakMap();
   const readerOpen=el=>{const r=globalThis.RFIDScanner;
@@ -60,7 +63,7 @@
     endBurst(true);
   }
   function endBurst(refocus){
-    clearTimeout(timer);timer=null;burst=false;fast=0;
+    clearTimeout(timer);timer=null;burst=false;fast=0;slow=0;
     // Only put focus back when it was LOST (page body). Never steal it from where the person clicked.
     const el=beforeEl,a=document.activeElement;
     if(refocus&&el&&el.isConnected&&(!a||a===document.body)){try{el.focus({preventScroll:true})}catch(_){}}
@@ -187,7 +190,7 @@
         // Its own confirmed prefix owns the rollback baseline, so rejecting
         // that frame cannot erase the person's preceding character/selection.
         before=epcPending.before;beforeEl=el;selStart=epcPending.start;selEnd=epcPending.end;
-        candidatePrefix=epcPending.prefix;candidateAt=now;fast=2;
+        candidatePrefix=epcPending.prefix;candidateAt=now;fast=2;slow=2;
       }else if(epcPending.prefix.length<2)epcPending.prefix+=scan;
       epcPending.lastScan=scan;
       // Repeating one key after a weak two/three-key prefix is ordinary held-key
@@ -212,10 +215,10 @@
   },true);
 
   function resetCandidate(el,now,scan){
-    fast=1;candidateAt=now;candidatePrefix=scan;remember(el);
+    fast=1;slow=1;candidateAt=now;candidatePrefix=scan;remember(el);
   }
   function trackCandidate(el,now,gap,scan,repeat){
-    if(el!==beforeEl||gap>CANDIDATE_GAP_MS||!fast||now-candidateAt>BURST_HOLD_GAP_MS*BURST_KEYS){
+    if(el!==beforeEl||gap>CANDIDATE_GAP_MS||!fast||now-candidateAt>BURST_HOLD_GAP_MS*SLOW_BURST_KEYS){
       resetCandidate(el,now,scan);snapshot(el);return;
     }
     if(candidatePrefix.length<2)candidatePrefix+=scan;
@@ -226,6 +229,7 @@
     // Held keys do not supply additional evidence of a scanner. Once a frame
     // is identified its repeats are still swallowed by the frame handlers.
     if(gap<KEY_GAP_MS&&!repeat)fast++;
+    if(gap<CANDIDATE_GAP_MS&&!repeat)slow++;
   }
   function isBulkFrame(text){
     return typeof text==='string'&&/^(?:EPC[:=\s]+)?[A-Fa-f0-9]{6,100}[\r\n]*$/.test(text);
@@ -296,15 +300,15 @@
       return;                                                   // a person pressing Enter
     }
     if(!scan){                                                // non-hex input is left to the person; no inferred device identity
-      fast=0;remember(el);
+      fast=0;slow=0;remember(el);
       return;
     }
     // Wait for a complete, plausibly reader-speed hexadecimal prefix. Four fast
     // letters also occur in normal typing, so they must never trigger a rollback.
     // Rich contenteditable fields are not rewritten by this plain-input fallback.
-    if(el?.isContentEditable){fast=0;return}
+    if(el?.isContentEditable){fast=0;slow=0;return}
     trackCandidate(el,now,gap,scan,e.repeat);
-    if(fast>=BURST_KEYS){burst=true;lastScanKey=now;swallow(e);rollback(el);armEnd(now)}
+    if(fast>=BURST_KEYS||slow>=SLOW_BURST_KEYS){burst=true;lastScanKey=now;swallow(e);rollback(el);armEnd(now)}
   },true);
   ['keypress','keyup'].forEach(type=>document.addEventListener(type,e=>{
     if((burst||(closingEnter&&e.key==='Enter'))&&!readerOpen(e.target))swallow(e);
