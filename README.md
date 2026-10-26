@@ -47,6 +47,44 @@ The root `index.html` opens `manager/login.html` and preserves password-reset qu
 
 RFID reads never directly deduct stock. Only a committed successful checkout marks its individual RFID tags `PURCHASED`. A product's available stock is the count of its `AVAILABLE` tags; repeated reads do not create stock or quantity.
 
+## Defense-day quick installation (Windows and XAMPP)
+
+**Target:** run the complete classroom prototype locally, without redesigning any pages. **Python, the \`.venv\` folder, and the optional USB bridge are NOT required for ordinary keyboard-emulation RFID scanning.** For full configuration and limitations, follow the detailed sections below.
+
+1. **Bring and check hardware:** Windows laptop, USB UHF reader and cable, already registered EPC Gen2 tags, working webcam, and a phone or printed copies of \`demo-qr-codes/\` for payment simulations. Prepare a permitted screen recording or screenshots as a backup. Confirm all hardware in the actual venue.
+2. **Start XAMPP:** Use PHP 8.1+ with \`pdo_mysql\`, \`openssl\`, \`zlib\`; start **Apache** and **MySQL**. Enable Apache \`mod_rewrite\` and this folder's \`.htaccess\` overrides. Do not open the HTML pages using \`file://\`; serve through localhost.
+3. **Get the final source and PHP dependencies:** Use PowerShell:
+
+   \`\`\`powershell
+   cd C:\xampp\htdocs\QuickMart-Final
+   git status
+   git pull --ff-only origin main
+   composer install --no-interaction --prefer-dist
+   \`\`\`
+
+   Back up or commit local edits before pulling; do **not** force-reset a working system. On a new computer, clone first using \`git clone https://github.com/Kyoktaka/QuickMart-Final.git C:\xampp\htdocs\QuickMart-Final\` (only if that destination is absent). Composer installs PHPMailer in \`vendor/\`; never commit \`vendor/\`.
+4. **Select the correct database path:**
+   - **Already working XAMPP database:** Export/backup \`rfid_checkout_main\` in phpMyAdmin. **Do not import \`database/schema.sql\` on top of existing records.** Continue using your existing account, EPC registrations, and receipts.
+   - **Brand-new/empty installation:** Import \`database/schema.sql\` via phpMyAdmin or the fresh-install command later in this README. It creates the database, eight tables, and ten approved products, but **no manager account and no registered EPC tags**.
+   - **Legacy installation upgrade:** Back up and follow \`tools/database-upgrade.php\` below instead; it is not an automatic startup step.
+5. **Open QuickMart:** Browse to \`http://localhost/QuickMart-Final/\`. Create the first manager account only on a brand-new empty install; otherwise log in normally. Keep passwords and SMTP keys private. Password reset requires separately configured SMTP; email delivery is not necessary for a local checkout demonstration.
+6. **Check reader input:** Connect the identified \`VID_1A86/PID_E010\` USB HID scanner. The physical reader continuously types EPCs like a keyboard, even outside QuickMart. The application captures them only during authorized **Start Scanning** / **Product Recognition**, while its JavaScript guard reduces text-field interference. For typing into forms, first move the RFID tags away from the reader, or disconnect it if needed. **Do not use an unverified Chafon utility, switch drivers, or turn on the Python bridge** for tomorrow's demonstration.
+7. **Restock sample tags if necessary:** Inventory → choose the active product → **Assign EPC tags** → manager password → **Start Scanning** → read each distinct tag → **Stop Scanning** → review → **Register N Tags**. Product catalog rows alone are not stock; only valid AVAILABLE registered EPCs count.
+8. **Rehearse the demo:** Authorize Product Recognition, scan one/multiple registered available EPCs, show duplicate prevention, temporary missed-read hold-in-cart, cart review/confirmation, and demo QR scanning. Verify History and that **only successful** simulated checkout changes RFID status to PURCHASED. Cancelled items become *eligible* on a new RFID read **2 seconds** after cancellation, plus real reader/backend latency. Individual Remove actions use read-gap/absence logic, not the cancellation timer.
+9. **Before defense:** Check camera permissions, Apache/MySQL, no blocking browser errors, correct prices/registered EPCs, and the localhost URL. The QR codes simulate outcomes, **not real wallet transfers**. Physical reading range and 20-tag reliability remain hardware tests, not guaranteed by automated checks.
+
+**Optional Python virtual environment for development/testing only:**
+
+\`\`\`powershell
+cd C:\xampp\htdocs\QuickMart-Final
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r rfid-bridge\requirements.txt
+.\.venv\Scripts\python.exe rfid-bridge\rfid_bridge.py --list
+\`\`\`
+
+These commands install local dependencies and enumerate USB devices; they do **not** make the current HID-keyboard scanner compatible with raw-USB capture. Keep \`rfid-bridge/rfid_bridge.json\` unconfigured until independent reader-interface support is verified. If the \`py\` launcher is unavailable, use \`python\`. The entire \`.venv/\` directory is generated locally and should never be committed. After pulling a commit that removes a previously tracked \`.venv/\`, recreate it using these commands only if you need Python tooling.
+
+
 ## XAMPP installation
 
 1. Install XAMPP with a compatible PHP runtime. Enable the PHP extensions listed above and start MySQL. Use the same PHP version for Apache and command-line checks.
@@ -298,9 +336,9 @@ Once validated, an item remains in the cart through missed reads and recoverable
 
 **Remove** asks the customer to confirm the number of physical units. An individually removed EPC that remains detected is suppressed to prevent immediate re-addition. Removal retains its last-read timestamp. Automatic rearming compares a returning read with the cadence measured before that read, using a gap of at least 1.5 seconds and one measured inventory cycle plus the larger of 500 ms or 25 percent of that cycle. The return gap cannot inflate its own threshold. Unmeasured first repeats do not prove removal, and time spent in a blocked popup does not count as absence. Genuine adaptive absence still clears suppression without an additional waiting period. Read gaps estimate movement; they cannot prove a physical lift-off.
 
-**Cancel Order**, **Cancel transaction** and **Cancel Payment** finish the server cancellation, clear the cart, and apply a fixed three-second pause to the cancelled EPCs. Their next fresh RFID read after that pause automatically starts a new checkout; no rescan button is needed. Repeated reads during the pause do not extend its deadline. Products are not restored from cached presence alone, and a failed cancellation keeps the current cart instead of arming a new checkout. Refresh preserves the original deadline. Popup/authorization restrictions, exact-EPC deduplication and PHP eligibility validation still apply, including rejection of purchased, inactive and unknown tags.
+**Cancel Order**, **Cancel transaction** and **Cancel Payment** finish the server cancellation, clear the cart, and apply a fixed two-second pause (`CANCEL_REARM_MS = 2000`) to the cancelled EPCs. Their next fresh RFID read after that pause automatically starts a new checkout; no rescan button is needed. Repeated reads during the pause do not extend its deadline. Products are not restored from cached presence alone, and a failed cancellation keeps the current cart instead of arming a new checkout. Refresh preserves the original deadline. Popup/authorization restrictions, exact-EPC deduplication and PHP eligibility validation still apply, including rejection of purchased, inactive and unknown tags.
 
-A cancelled tag left on the reader can be added again after the pause because the reader continues reporting it. The visible delay is three seconds plus the wait for the next actual inventory report and backend response; a slow physical reader cannot be promised a three-to-four-second result. Individual **Remove** actions and idle timeouts retain their movement/absence rules. Explicit **Input Tag** remains a deliberate, backend-validated way to add a known EPC.
+A cancelled tag left on the reader can be added again after the pause because the reader continues reporting it. The earliest eligible read is two seconds after successful cancellation; visible delay includes the next physical inventory report and backend response, so an exact on-screen return time is not guaranteed. Individual **Remove** actions and idle timeouts retain their movement/absence rules. Explicit **Input Tag** remains a deliberate, backend-validated way to add a known EPC.
 
 The cart becomes a server checkout session and is saved after changes. **Checkout** opens **Check your cart**. PHP validates a revision of the cart; **Confirm Checkout** must confirm that same reviewed revision before payment begins. Changes in price, product status or tag eligibility require another review.
 
@@ -383,7 +421,7 @@ The focused follow-up passed 82 input-frame checks, the complete portable suite,
 
 `tests/rfid-modifier-guard.js` adds 118 checks for lowercase EPCs, Shift-modified digits, Caps Lock transitions during a frame, exact human character/selection preservation, raw-mode bypass, and authorized capture. Native Chrome reproduced the old held-Shift leak and the Caps Lock prefix leak; the patched guard passed four real-form scenarios with no submissions, and the 34 form observations across six pages passed again. Automated Chrome does not toggle the actual Caps Lock letter-case state, so case inversion is covered by simulated input events. A deliberate 650 ms pause before the closing Enter exceeds the 600 ms prefix-frame window and allows the form to submit; this confirms the documented timing limitation rather than physical-device isolation.
 
-`tests/rfid-edit-isolation.js` exercises edits at every interior position of both supported reader prefixes, four editable field types, replacement selections and collapsed carets, ordinary text replay order, held deletion and delayed Enter. `tests/kiosk-rescan.js` loads the actual scanner together with the kiosk, including its live cadence estimator: it covers individual-removal read gaps, every cancellation control, the exact three-second boundary, automatic three-to-four-second returns, continuous-read deduplication, slow and unmeasured cadence, multiple tags, refresh, failed cancellation, popup pauses, genuine absence and backend rejection. These are simulated browser/USB/API scenarios; physical reader acceptance remains required.
+`tests/rfid-edit-isolation.js` exercises edits at every interior position of both supported reader prefixes, four editable field types, replacement selections and collapsed carets, ordinary text replay order, held deletion and delayed Enter. `tests/kiosk-rescan.js` loads the actual scanner together with the kiosk, including its live cadence estimator: it covers individual-removal read gaps, every cancellation control, the exact two-second boundary, automatic eligible returns after two seconds, continuous-read deduplication, slow and unmeasured cadence, multiple tags, refresh, failed cancellation, popup pauses, genuine absence and backend rejection. These are simulated browser/USB/API scenarios; physical reader acceptance remains required.
 
 The GitHub Actions workflow in `.github/workflows/` is configured to install Composer dependencies, run the unified checks, and run database integration against a disposable MySQL 8.0 service. Local database verification uses XAMPP MariaDB 10.4. Check the pull request's actual GitHub check results for remote CI status. A passing suite establishes the tested software behavior, not a complete customer playthrough or physical hardware certification.
 
@@ -400,7 +438,7 @@ Use a backed-up staging installation and record the actual reader model, VID/PID
 - [ ] Test 1, 5, 10, 15 and 20 tags for 30–60 seconds each at the center, corners, height limits and outside the intended platform. Repeat with metal/liquid packaging and changed orientations; measure actual power/range using vendor-supported controls.
 - [ ] In Product Recognition, verify same-EPC deduplication, different EPCs for one product, unknown/inactive/purchased rejection, retained carts during missed reads, and both detection indicators.
 - [ ] Remove a cart item while it remains on the reader; confirm no immediate re-addition. Physically remove it until absence is observed, rescan, and confirm prompt eligibility with no extra suppression timer. Verify manual EPC entry remains deliberate and backend validated.
-- [ ] Cancel through the cart, payment and failed-transaction controls. Verify there is no rescan button: the same available products return automatically on a fresh read after a three-second pause. Repeated reads must not extend the pause or duplicate EPCs. Refresh during the pause and verify the original deadline. A cancellation failure must keep the old cart, and purchased/inactive/unknown tags must still be rejected. Repeat with multiple physical tags and record the actual inventory/report latency.
+- [ ] Cancel through the cart, payment and failed-transaction controls. Verify there is no rescan button: the same available products become eligible on a fresh read after a two-second pause. Repeated reads must not extend the pause or duplicate EPCs. Refresh during the pause and verify the original deadline. A cancellation failure must keep the old cart, and purchased/inactive/unknown tags must still be rejected. Repeat with multiple physical tags and record the actual inventory/report latency.
 - [ ] Review the cart, return to edit, then confirm payment. Change price/availability between review and payment and confirm the customer must review updated information.
 - [ ] Test Back, Forward, refresh, page-cache restoration, attempted manager URLs, close/reopen where supported, expired scan authorization and manager exit. Recover an interrupted cart/payment under the same valid PHP session; verify manager APIs stay protected during kiosk mode.
 - [ ] With camera permission enabled, scan each classroom QR image and an invalid QR. Verify camera retry, attempts one/two/three, refresh after failed attempts, the five-minute deadline, customer cancellation and cart inactivity cancellation. Confirm actual network loss does not fabricate success or failure.

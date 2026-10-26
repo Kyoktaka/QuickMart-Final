@@ -8,3 +8,7 @@ rfid-bridge/dist/
 rfid-bridge/*.spec
 *.log
 *.sql.gz
+
+# Never track local Python environments
+.venv/
+venv/
