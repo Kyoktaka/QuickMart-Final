@@ -4,11 +4,10 @@ const EPC='E28011700000021905AC150B',OTHER='E28011700000021905AC150C';
 let checks=0;
 function check(actual,expected,label){assert.deepEqual(actual,expected,label);checks++}
 const html=fs.readFileSync('manager/kiosk.html','utf8');
-for(const id of ['btn-rescan-idle','btn-rescan-cart'])
-  check(new RegExp('<button\\b[^>]*id="'+id+'"[^>]*type="button"[^>]*hidden[^>]*>Rescan products</button>').test(html),true,
-    'Rescan is a real, initially hidden button in '+id);
-function setup(){
-  let now=0,nextTimer=0,nextSession=0;
+check(/btn-rescan|Rescan products/i.test(html),false,'Rescanning requires no button on either screen');
+function setup(options={}){
+  let now=options.now??0,nextTimer=0,nextSession=0;
+  const stored=options.stored||new Map();
   const timers=new Map(),listeners=new Map(),keys=[],elements=new Map(),lookups=[],reads=[];
   const statuses=new Map([[EPC,'AVAILABLE'],[OTHER,'AVAILABLE']]);
   function el(selector){
@@ -32,7 +31,7 @@ function setup(){
         unknown_epcs:epcs.filter(epc=>!statuses.has(epc)),inactive_epcs:epcs.filter(epc=>statuses.get(epc)==='INACTIVE')};
     },
     saveCheckout:async id=>result(id,'CART'),closeCheckout:async id=>result(id,'VOIDED'),
-    revokeScan:async()=>{},checkoutStatus:async id=>result(id,'CART')};
+    revokeScan:async()=>{},checkoutStatus:async id=>id?result(id,'CART'):{session:null}};
   const schedule=(fn,ms,repeat=false)=>{const id=++nextTimer;timers.set(id,{fn,at:now+ms,ms,repeat});return id};
   const sandbox={state,Backend:backend,SS_KIOSK:'kiosk',TIMEOUT:300,$:el,
     $$:()=>['k-idle','k-cart','k-qr','k-success','k-fail'].map(id=>el('#'+id)),
@@ -45,7 +44,7 @@ function setup(){
     setInterval:(fn,ms)=>schedule(fn,ms,true),clearInterval:id=>timers.delete(id),
     openModal:id=>el('#'+id).classList.add('on'),closeModal:id=>el('#'+id).classList.remove('on'),
     stopCameraScanner(){},async startCameraScanner(){},resetQrFailureAttempts(){},openAuth(){},
-    sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},location:{href:''},
+    sessionStorage:{getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)},location:{href:''},
     toast(){},pushActivity(){},esc:String,peso:String,codeFor:String};
   sandbox.window=sandbox;vm.createContext(sandbox);
   for(const path of ['assets/js/rfid-scanner.js','js/kiosk.js'])vm.runInContext(fs.readFileSync(path,'utf8'),sandbox);
@@ -74,7 +73,7 @@ function setup(){
     for(const fn of keys)fn({key:'Enter',preventDefault(){},stopPropagation(){}});
     await settle();
   }
-  return {state,scanner,run,el,advance,readAt,lookups,reads,statuses,time:()=>now,
+  return {state,scanner,run,el,advance,readAt,lookups,reads,statuses,backend,stored,time:()=>now,
     suppressed:epc=>run('removedEpcs.has('+JSON.stringify(epc||EPC)+')'),
     async warmup(interval=1000){for(const at of [1000,1000+interval,1000+interval*2])await readAt(at);await advance(180)},
     async remove(){run('removeFromCart(1,1)');await advance(0)},
@@ -84,12 +83,9 @@ async function main(){
   {
     const h=setup();await h.readAt(1000);await h.advance(180);await h.remove();await h.readAt(3000);
     check(h.suppressed(),true,'An unmeasured first inventory repeat cannot prove removal');
-    await h.click('btn-rescan-idle');await h.readAt(3500);await h.advance(180);
-    check(h.state.cart[0]?.qty,1,'Explicit Rescan remains immediate for an unmeasured reader cadence');
   }
   {
     const h=setup();await h.warmup();await h.remove();
-    check(h.el('#btn-rescan-idle').hidden,false,'Removing the last item exposes Rescan on the idle screen');
     await h.readAt(5000);await h.advance(180);
     check(h.state.cart[0]?.qty,1,'First returning read after a two-second gap restores the item');
     check(h.suppressed(),false,'Last-read baseline survives removal');
@@ -106,44 +102,92 @@ async function main(){
     for(const at of [10000,13000,16000])await h.readAt(at);
     check(h.suppressed(),true,'Normal slow inventory rounds cannot re-add a removed tag');
     check(h.state.cart.length,0,'Removed product stays out while continuously read');
-    const calls=h.lookups.length;
-    await h.click('btn-rescan-idle');
-    check(h.lookups.length,calls,'Rescan waits for a fresh read rather than trusting a stale presence snapshot');
-    check(h.el('#btn-rescan-idle').hidden,true,'Rescan control hides after explicit release');
-    await h.readAt(17000);await h.advance(180);
-    check(h.state.cart[0]?.qty,1,'Explicit Rescan accepts the next read without an absence timeout');
-    await h.readAt(18000);await h.advance(180);
-    check(h.state.cart[0]?.qty,1,'Repeated reads after Rescan remain deduplicated');
   }
   {
     const h=setup();await h.warmup();await h.readAt(3500,OTHER);await h.advance(180);await h.remove();
     check(h.state.cart[0]?.qty,1,'Partial removal retains the other physical item');
-    check(h.el('#btn-rescan-cart').hidden,false,'Partial removal exposes Rescan on the cart screen');
-    await h.click('btn-rescan-cart');await h.readAt(4000,OTHER);await h.advance(180);
-    check(h.state.cart[0]?.qty,2,'Explicit Rescan restores only the newly read missing EPC');
+    await h.readAt(5500,OTHER);await h.advance(180);
+    check(h.state.cart[0]?.qty,2,'A physical read gap restores the removed unit automatically');
+  }
+  for(const button of ['btn-cancel','btn-cancel2','btn-cancel-scan']){
+    const h=setup();await h.warmup();const previousId=h.state.current;
+    if(button==='btn-cancel-scan')h.run("screen('k-qr')");
+    if(button==='btn-cancel2')h.run("screen('k-fail')");
+    await h.click(button);const cancelledAt=h.time(),calls=h.lookups.length;
+    check(h.state.cart.length,0,button+': cancellation clears the cart');
+    await h.readAt(cancelledAt+1000);
+    await h.readAt(cancelledAt+2000);
+    await h.readAt(cancelledAt+2999);
+    check(h.state.cart.length,0,button+': reads before three seconds do not rebuild the cart');
+    check(h.lookups.length,calls,button+': suppressed reads do not reach the API');
+    await h.readAt(cancelledAt+3500);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,button+': a fresh read between three and four seconds restores automatically');
+    check(h.state.current!==previousId,true,button+': restored product starts a new checkout');
+    await h.readAt(cancelledAt+4500);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,button+': continued reads cannot duplicate the EPC');
   }
   {
-    const h=setup();await h.warmup();await h.click('btn-cancel');
-    check(h.state.cart.length,0,'Cancellation clears the cart');
-    check(h.suppressed(),true,'Cancellation keeps continuous reads suppressed');
-    await h.readAt(5000);await h.advance(180);
-    check(h.state.cart[0]?.qty,1,'Cancellation preserves the last-read timestamp for the first returning scan');
+    const h=setup();await h.readAt(1000);await h.advance(180);await h.click('btn-cancel');
+    await h.readAt(h.time()+3000);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,'Exact three-second boundary works without any measured inventory cadence');
+  }
+  {
+    const h=setup();await h.warmup();await h.click('btn-cancel');const cancelledAt=h.time();
+    await h.advance(3100);
+    check(h.state.cart.length,0,'Expired cooldown does not restore a stale presence snapshot');
+    await h.readAt(cancelledAt+4000);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,'A fresh read at four seconds restores the cancelled product');
+  }
+  {
+    const h=setup();await h.warmup();await h.advance(4200);await h.click('btn-cancel');const cancelledAt=h.time();
+    await h.readAt(cancelledAt+1000);await h.advance(180);
+    check(h.state.cart.length,0,'An early presence-expiry event cannot bypass the cancellation pause');
+    await h.readAt(cancelledAt+3500);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,'Cancelled tag returns after three seconds even if its old presence expired');
+  }
+  {
+    const h=setup();await h.warmup(7000);await h.click('btn-cancel');const cancelledAt=h.time();
+    await h.readAt(cancelledAt+3500);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,'Slow inventory cadence cannot extend the cancellation cooldown');
+  }
+  {
+    const h=setup();await h.warmup();await h.readAt(3500,OTHER);await h.advance(180);await h.click('btn-cancel');
+    const cancelledAt=h.time();await h.readAt(cancelledAt+3200);await h.readAt(cancelledAt+3500,OTHER);await h.advance(180);
+    check(h.state.cart[0]?.qty,2,'Both distinct physical tags return automatically after cancellation');
+  }
+  {
+    const h=setup();await h.warmup();await h.click('btn-cancel');const cancelledAt=h.time();
+    const refreshed=setup({stored:h.stored,now:cancelledAt+2000});await refreshed.run('recoverCheckout()');
+    await refreshed.readAt(cancelledAt+2999);await refreshed.advance(0);
+    check(refreshed.state.cart.length,0,'Refresh retains the original cancellation deadline');
+    await refreshed.readAt(cancelledAt+3500);await refreshed.advance(180);
+    check(refreshed.state.cart[0]?.qty,1,'Refresh does not restart the three-second pause');
+  }
+  {
+    const h=setup();await h.warmup();h.backend.closeCheckout=async()=>{throw Error('offline')};await h.click('btn-cancel');
+    check(h.state.cart[0]?.qty,1,'Failed cancellation preserves the existing cart');
+    check(h.run('cancelledUntil.size'),0,'Failed cancellation cannot arm a new checkout');
   }
   {
     const h=setup();await h.warmup();await h.remove();
     h.run("openHold('m-tag')");await h.advance(10000);h.run("closeHold('m-tag')");
     await h.readAt(14000);await h.advance(180);
     check(h.suppressed(),true,'Time spent in a blocked popup cannot masquerade as physical removal');
-    h.run("openHold('m-tag')");await h.click('btn-rescan-idle');
-    check(h.suppressed(),true,'Rescan cannot bypass an open blocking popup');
+  }
+  {
+    const h=setup();await h.warmup();await h.click('btn-cancel');const cancelledAt=h.time();
+    h.run("openHold('m-tag')");await h.readAt(cancelledAt+3500);await h.advance(180);
+    check(h.state.cart.length,0,'Cancellation rearming cannot bypass a blocking popup');
+    h.run("closeHold('m-tag')");await h.readAt(cancelledAt+4500);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,'Automatic scanning resumes after the popup closes');
   }
   for(const status of ['PURCHASED','INACTIVE',null]){
-    const h=setup();await h.warmup();await h.remove();
+    const h=setup();await h.warmup();await h.click('btn-cancel');const cancelledAt=h.time();
     if(status)h.statuses.set(EPC,status);else h.statuses.delete(EPC);
-    await h.click('btn-rescan-idle');await h.readAt(3500);await h.advance(180);
-    check(h.state.cart.length,0,'Explicit Rescan still requires backend eligibility validation: '+status);
-    const calls=h.lookups.length;await h.readAt(4500);await h.advance(180);
-    check(h.lookups.length,calls,'Repeated rejected reads cannot restart lookups after explicit Rescan');
+    await h.readAt(cancelledAt+3500);await h.advance(180);
+    check(h.state.cart.length,0,'Automatic rescanning still requires backend eligibility validation: '+status);
+    const calls=h.lookups.length;await h.readAt(cancelledAt+4500);await h.advance(180);
+    check(h.lookups.length,calls,'Repeated rejected reads cannot restart lookups after cancellation');
   }
   {
     const h=setup();await h.warmup(3000);await h.remove();await h.advance(9500);
