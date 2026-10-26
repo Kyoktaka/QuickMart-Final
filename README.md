@@ -49,40 +49,40 @@ RFID reads never directly deduct stock. Only a committed successful checkout mar
 
 ## Defense-day quick installation (Windows and XAMPP)
 
-**Target:** run the complete classroom prototype locally, without redesigning any pages. **Python, the \`.venv\` folder, and the optional USB bridge are NOT required for ordinary keyboard-emulation RFID scanning.** For full configuration and limitations, follow the detailed sections below.
+**Target:** run the complete classroom prototype locally, without redesigning any pages. **Python, the `.venv` folder, and the optional USB bridge are NOT required for ordinary keyboard-emulation RFID scanning.** For full configuration and limitations, follow the detailed sections below.
 
-1. **Bring and check hardware:** Windows laptop, USB UHF reader and cable, already registered EPC Gen2 tags, working webcam, and a phone or printed copies of \`demo-qr-codes/\` for payment simulations. Prepare a permitted screen recording or screenshots as a backup. Confirm all hardware in the actual venue.
-2. **Start XAMPP:** Use PHP 8.1+ with \`pdo_mysql\`, \`openssl\`, \`zlib\`; start **Apache** and **MySQL**. Enable Apache \`mod_rewrite\` and this folder's \`.htaccess\` overrides. Do not open the HTML pages using \`file://\`; serve through localhost.
+1. **Bring and check hardware:** Windows laptop, USB UHF reader and cable, already registered EPC Gen2 tags, working webcam, and a phone or printed copies of `demo-qr-codes/` for payment simulations. Prepare a permitted screen recording or screenshots as a backup. Confirm all hardware in the actual venue.
+2. **Start XAMPP:** Use PHP 8.1+ with `pdo_mysql`, `openssl`, `zlib`; start **Apache** and **MySQL**. Enable Apache `mod_rewrite` and this folder's `.htaccess` overrides. Do not open the HTML pages using `file://`; serve through localhost.
 3. **Get the final source and PHP dependencies:** Use PowerShell:
 
-   \`\`\`powershell
+   ```powershell
    cd C:\xampp\htdocs\QuickMart-Final
    git status
    git pull --ff-only origin main
    composer install --no-interaction --prefer-dist
-   \`\`\`
+   ```
 
-   Back up or commit local edits before pulling; do **not** force-reset a working system. On a new computer, clone first using \`git clone https://github.com/Kyoktaka/QuickMart-Final.git C:\xampp\htdocs\QuickMart-Final\` (only if that destination is absent). Composer installs PHPMailer in \`vendor/\`; never commit \`vendor/\`.
+   Back up or commit local edits before pulling; do **not** force-reset a working system. On a new computer, clone first using `git clone https://github.com/Kyoktaka/QuickMart-Final.git C:\xampp\htdocs\QuickMart-Final` (only if that destination is absent). Composer installs PHPMailer in `vendor/`; never commit `vendor/`.
 4. **Select the correct database path:**
-   - **Already working XAMPP database:** Export/backup \`rfid_checkout_main\` in phpMyAdmin. **Do not import \`database/schema.sql\` on top of existing records.** Continue using your existing account, EPC registrations, and receipts.
-   - **Brand-new/empty installation:** Import \`database/schema.sql\` via phpMyAdmin or the fresh-install command later in this README. It creates the database, eight tables, and ten approved products, but **no manager account and no registered EPC tags**.
-   - **Legacy installation upgrade:** Back up and follow \`tools/database-upgrade.php\` below instead; it is not an automatic startup step.
-5. **Open QuickMart:** Browse to \`http://localhost/QuickMart-Final/\`. Create the first manager account only on a brand-new empty install; otherwise log in normally. Keep passwords and SMTP keys private. Password reset requires separately configured SMTP; email delivery is not necessary for a local checkout demonstration.
-6. **Check reader input:** Connect the identified \`VID_1A86/PID_E010\` USB HID scanner. The physical reader continuously types EPCs like a keyboard, even outside QuickMart. The application captures them only during authorized **Start Scanning** / **Product Recognition**, while its JavaScript guard reduces text-field interference. For typing into forms, first move the RFID tags away from the reader, or disconnect it if needed. **Do not use an unverified Chafon utility, switch drivers, or turn on the Python bridge** for tomorrow's demonstration.
+   - **Already working XAMPP database:** Export/backup `rfid_checkout_main` in phpMyAdmin. **Do not import `database/schema.sql` on top of existing records.** Continue using your existing account, EPC registrations, and receipts.
+   - **Brand-new/empty installation:** Import `database/schema.sql` via phpMyAdmin or the fresh-install command later in this README. It creates the database, eight tables, and ten approved products, but **no manager account and no registered EPC tags**.
+   - **Legacy installation upgrade:** Back up and follow `tools/database-upgrade.php` below instead; it is not an automatic startup step.
+5. **Open QuickMart:** Browse to `http://localhost/QuickMart-Final/`. Create the first manager account only on a brand-new empty install; otherwise log in normally. Keep passwords and SMTP keys private. Password reset requires separately configured SMTP; email delivery is not necessary for a local checkout demonstration.
+6. **Check reader input:** Connect the identified `VID_1A86/PID_E010` USB HID scanner. The physical reader continuously types EPCs like a keyboard, even outside QuickMart. The application captures them only during authorized **Start Scanning** / **Product Recognition**, while its JavaScript guard reduces text-field interference. For typing into forms, first move the RFID tags away from the reader, or disconnect it if needed. **Do not use an unverified Chafon utility, switch drivers, or turn on the Python bridge** for tomorrow's demonstration.
 7. **Restock sample tags if necessary:** Inventory → choose the active product → **Assign EPC tags** → manager password → **Start Scanning** → read each distinct tag → **Stop Scanning** → review → **Register N Tags**. Product catalog rows alone are not stock; only valid AVAILABLE registered EPCs count.
 8. **Rehearse the demo:** Authorize Product Recognition, scan one/multiple registered available EPCs, show duplicate prevention, temporary missed-read hold-in-cart, cart review/confirmation, and demo QR scanning. Verify History and that **only successful** simulated checkout changes RFID status to PURCHASED. Cancelled items become *eligible* on a new RFID read **2 seconds** after cancellation, plus real reader/backend latency. Individual Remove actions use read-gap/absence logic, not the cancellation timer.
 9. **Before defense:** Check camera permissions, Apache/MySQL, no blocking browser errors, correct prices/registered EPCs, and the localhost URL. The QR codes simulate outcomes, **not real wallet transfers**. Physical reading range and 20-tag reliability remain hardware tests, not guaranteed by automated checks.
 
 **Optional Python virtual environment for development/testing only:**
 
-\`\`\`powershell
+```powershell
 cd C:\xampp\htdocs\QuickMart-Final
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r rfid-bridge\requirements.txt
 .\.venv\Scripts\python.exe rfid-bridge\rfid_bridge.py --list
-\`\`\`
+```
 
-These commands install local dependencies and enumerate USB devices; they do **not** make the current HID-keyboard scanner compatible with raw-USB capture. Keep \`rfid-bridge/rfid_bridge.json\` unconfigured until independent reader-interface support is verified. If the \`py\` launcher is unavailable, use \`python\`. The entire \`.venv/\` directory is generated locally and should never be committed. After pulling a commit that removes a previously tracked \`.venv/\`, recreate it using these commands only if you need Python tooling.
+These commands install local dependencies and enumerate USB devices; they do **not** make the current HID-keyboard scanner compatible with raw-USB capture. Keep `rfid-bridge/rfid_bridge.json` unconfigured until independent reader-interface support is verified. If the `py` launcher is unavailable, use `python`. The entire `.venv/` directory is generated locally and should never be committed. After pulling a commit that removes a previously tracked `.venv/`, recreate it using these commands only if you need Python tooling.
 
 
 ## XAMPP installation
