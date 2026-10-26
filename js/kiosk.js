@@ -15,7 +15,7 @@ const rejectedEpcs=new Set();     // unknown / inactive EPCs, ignored until the 
 const absentEpcs=new Set();       // explicit reader expiry, distinct from a cleared or paused snapshot
 const removedReadAt=new Map();    // removed EPC -> last read in the scanner's monotonic clock
 const cancelledUntil=new Map();  // cancelled EPC -> wall-clock deadline for the next checkout
-const REARM_GAP_MS=1500,CANCEL_REARM_MS=3000;
+const REARM_GAP_MS=1000,CANCEL_REARM_MS=2000;
 // A removed tag is re-armed on an actual reader absence event, without a second fixed waiting period.
 const CHECKOUT_STORAGE='qm_checkout';
 let checkoutSession=null,reviewedRevision=null,saveChain=Promise.resolve(),navigationProtected=false;

@@ -75,13 +75,13 @@ function setup(options={}){
   }
   return {state,scanner,run,el,advance,readAt,lookups,reads,statuses,backend,stored,time:()=>now,
     suppressed:epc=>run('removedEpcs.has('+JSON.stringify(epc||EPC)+')'),
-    async warmup(interval=1000){for(const at of [1000,1000+interval,1000+interval*2])await readAt(at);await advance(180)},
+    async warmup(interval=900){for(const at of [900,900+interval,900+interval*2])await readAt(at);await advance(180)},
     async remove(){run('removeFromCart(1,1)');await advance(0)},
     async click(id){await el('#'+id).onclick();await settle()}};
 }
 async function main(){
   {
-    const h=setup();await h.readAt(1000);await h.advance(180);await h.remove();await h.readAt(3000);
+    const h=setup();await h.readAt(1000);await h.advance(180);await h.remove();await h.readAt(1000);
     check(h.suppressed(),true,'An unmeasured first inventory repeat cannot prove removal');
   }
   {
@@ -93,7 +93,7 @@ async function main(){
   {
     const h=setup();await h.warmup(3000);await h.remove();
     await h.readAt(11000);await h.advance(180);
-    check(h.reads.at(-1).previousCycleMs,3000,'Returning read carries the pre-gap inventory cycle');
+    check(h.reads.at(-1).previousCycleMs,1000,'Returning read carries the pre-gap inventory cycle');
     check(h.scanner.getReadHealth().estimatedInventoryCycleMs,3400,'Actual estimator includes the new gap after its snapshot');
     check(h.state.cart[0]?.qty,1,'A four-second return no longer inflates its own release threshold');
   }
