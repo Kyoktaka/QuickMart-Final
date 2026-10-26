@@ -81,7 +81,7 @@ function setup(options={}){
 }
 async function main(){
   {
-    const h=setup();await h.readAt(1000);await h.advance(180);await h.remove();await h.readAt(1000);
+    const h=setup();await h.readAt(1000);await h.advance(180);await h.remove();await h.readAt(h.time()+EPC.length*8+1);
     check(h.suppressed(),true,'An unmeasured first inventory repeat cannot prove removal');
   }
   {
@@ -93,8 +93,8 @@ async function main(){
   {
     const h=setup();await h.warmup(3000);await h.remove();
     await h.readAt(11000);await h.advance(180);
-    check(h.reads.at(-1).previousCycleMs,1000,'Returning read carries the pre-gap inventory cycle');
-    check(h.scanner.getReadHealth().estimatedInventoryCycleMs,3400,'Actual estimator includes the new gap after its snapshot');
+    check(h.reads.at(-1).previousCycleMs,3000,'Returning read carries the 3000 ms pre-gap inventory cycle');
+    check(h.scanner.getReadHealth().estimatedInventoryCycleMs,3440,'Actual estimator includes the 4100 ms returning gap only after the snapshot');
     check(h.state.cart[0]?.qty,1,'A four-second return no longer inflates its own release threshold');
   }
   {
@@ -115,53 +115,53 @@ async function main(){
     if(button==='btn-cancel2')h.run("screen('k-fail')");
     await h.click(button);const cancelledAt=h.time(),calls=h.lookups.length;
     check(h.state.cart.length,0,button+': cancellation clears the cart');
-    await h.readAt(cancelledAt+1000);
-    await h.readAt(cancelledAt+2000);
-    await h.readAt(cancelledAt+2999);
-    check(h.state.cart.length,0,button+': reads before three seconds do not rebuild the cart');
+    await h.readAt(cancelledAt+500);
+    await h.readAt(cancelledAt+1200);
+    await h.readAt(cancelledAt+1999);
+    check(h.state.cart.length,0,button+': reads before two seconds do not rebuild the cart');
     check(h.lookups.length,calls,button+': suppressed reads do not reach the API');
-    await h.readAt(cancelledAt+3500);await h.advance(180);
-    check(h.state.cart[0]?.qty,1,button+': a fresh read between three and four seconds restores automatically');
+    await h.readAt(cancelledAt+2500);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,button+': a fresh read after two seconds restores automatically');
     check(h.state.current!==previousId,true,button+': restored product starts a new checkout');
-    await h.readAt(cancelledAt+4500);await h.advance(180);
+    await h.readAt(cancelledAt+3500);await h.advance(180);
     check(h.state.cart[0]?.qty,1,button+': continued reads cannot duplicate the EPC');
   }
   {
     const h=setup();await h.readAt(1000);await h.advance(180);await h.click('btn-cancel');
-    await h.readAt(h.time()+3000);await h.advance(180);
-    check(h.state.cart[0]?.qty,1,'Exact three-second boundary works without any measured inventory cadence');
+    await h.readAt(h.time()+2000);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,'Exact two-second boundary works without any measured inventory cadence');
   }
   {
     const h=setup();await h.warmup();await h.click('btn-cancel');const cancelledAt=h.time();
-    await h.advance(3100);
-    check(h.state.cart.length,0,'Expired cooldown does not restore a stale presence snapshot');
-    await h.readAt(cancelledAt+4000);await h.advance(180);
-    check(h.state.cart[0]?.qty,1,'A fresh read at four seconds restores the cancelled product');
+    await h.advance(2100);
+    check(h.state.cart.length,0,'Expired two-second cooldown does not restore a stale presence snapshot');
+    await h.readAt(cancelledAt+3000);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,'A fresh read after two seconds restores the cancelled product');
   }
   {
     const h=setup();await h.warmup();await h.advance(4200);await h.click('btn-cancel');const cancelledAt=h.time();
     await h.readAt(cancelledAt+1000);await h.advance(180);
     check(h.state.cart.length,0,'An early presence-expiry event cannot bypass the cancellation pause');
-    await h.readAt(cancelledAt+3500);await h.advance(180);
-    check(h.state.cart[0]?.qty,1,'Cancelled tag returns after three seconds even if its old presence expired');
+    await h.readAt(cancelledAt+2500);await h.advance(180);
+    check(h.state.cart[0]?.qty,1,'Cancelled tag returns after two seconds even if its old presence expired');
   }
   {
     const h=setup();await h.warmup(7000);await h.click('btn-cancel');const cancelledAt=h.time();
-    await h.readAt(cancelledAt+3500);await h.advance(180);
+    await h.readAt(cancelledAt+2500);await h.advance(180);
     check(h.state.cart[0]?.qty,1,'Slow inventory cadence cannot extend the cancellation cooldown');
   }
   {
     const h=setup();await h.warmup();await h.readAt(3500,OTHER);await h.advance(180);await h.click('btn-cancel');
-    const cancelledAt=h.time();await h.readAt(cancelledAt+3200);await h.readAt(cancelledAt+3500,OTHER);await h.advance(180);
+    const cancelledAt=h.time();await h.readAt(cancelledAt+2200);await h.readAt(cancelledAt+2500,OTHER);await h.advance(180);
     check(h.state.cart[0]?.qty,2,'Both distinct physical tags return automatically after cancellation');
   }
   {
     const h=setup();await h.warmup();await h.click('btn-cancel');const cancelledAt=h.time();
-    const refreshed=setup({stored:h.stored,now:cancelledAt+2000});await refreshed.run('recoverCheckout()');
-    await refreshed.readAt(cancelledAt+2999);await refreshed.advance(0);
+    const refreshed=setup({stored:h.stored,now:cancelledAt+1000});await refreshed.run('recoverCheckout()');
+    await refreshed.readAt(cancelledAt+1999);await refreshed.advance(0);
     check(refreshed.state.cart.length,0,'Refresh retains the original cancellation deadline');
-    await refreshed.readAt(cancelledAt+3500);await refreshed.advance(180);
-    check(refreshed.state.cart[0]?.qty,1,'Refresh does not restart the three-second pause');
+    await refreshed.readAt(cancelledAt+2500);await refreshed.advance(180);
+    check(refreshed.state.cart[0]?.qty,1,'Refresh does not restart the two-second pause');
   }
   {
     const h=setup();await h.warmup();h.backend.closeCheckout=async()=>{throw Error('offline')};await h.click('btn-cancel');
@@ -184,9 +184,9 @@ async function main(){
   for(const status of ['PURCHASED','INACTIVE',null]){
     const h=setup();await h.warmup();await h.click('btn-cancel');const cancelledAt=h.time();
     if(status)h.statuses.set(EPC,status);else h.statuses.delete(EPC);
-    await h.readAt(cancelledAt+3500);await h.advance(180);
+    await h.readAt(cancelledAt+2500);await h.advance(180);
     check(h.state.cart.length,0,'Automatic rescanning still requires backend eligibility validation: '+status);
-    const calls=h.lookups.length;await h.readAt(cancelledAt+4500);await h.advance(180);
+    const calls=h.lookups.length;await h.readAt(cancelledAt+3500);await h.advance(180);
     check(h.lookups.length,calls,'Repeated rejected reads cannot restart lookups after cancellation');
   }
   {
