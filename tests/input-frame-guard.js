@@ -155,7 +155,8 @@ for(const options of [{},{cancelable:false},{before:false}]){
 {
   const h=setup(),element=h.field();
   for(const key of 'James2026')h.press(element,key,7);
-  check(element.value,'manual James2026','Fast ordinary name input remains immediate');
+  h.advance(100);
+  check(element.value,'manual James2026','Fast ordinary name input retains its order after the short prefix window');
   h.advance(600);
   for(const key of EPC.slice(0,12))h.press(element,key,100);
   check(element.value,'manual James2026'+EPC.slice(0,12),'A person can type 12 hexadecimal characters at normal speed');

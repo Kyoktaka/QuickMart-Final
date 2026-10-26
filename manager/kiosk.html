@@ -11,13 +11,13 @@
 <link rel="stylesheet" href="../css/layout.css?v=update-v3">
 <link rel="stylesheet" href="../css/components.css?v=update-v3">
 <link rel="stylesheet" href="../css/modals.css?v=cart-latch-v1&u=3">
-<link rel="stylesheet" href="../css/kiosk.css?v=cart-latch-v1">
+<link rel="stylesheet" href="../css/kiosk.css?v=rescan-20261026">
 <link rel="stylesheet" href="../css/toast.css">
 <link rel="stylesheet" href="../css/camera.css">
 <link rel="stylesheet" href="../css/responsive.css?v=update-v3">
 <link rel="stylesheet" href="../css/kiosk-welcome.css">
 <script src="../js/guard.js?v=integration-20261025" data-require-kiosk></script>
-<script src="../js/password-guard.js?v=interleaved-edits-20261025"></script>
+<script src="../js/password-guard.js?v=prefix-edits-20261026"></script>
 </head>
 <body>
 
@@ -33,7 +33,7 @@
       <circle cx="-45" cy="123" r="122" fill="url(#bg2)"/><circle cx="342" cy="139" r="60" fill="url(#bg1)"/>
       <circle cx="1136" cy="72" r="38" fill="url(#bg1)"/><circle cx="1338" cy="206" r="65" fill="url(#bg1)"/>
       <circle cx="208" cy="365" r="43" fill="url(#bg2)"/><circle cx="1137" cy="366" r="60" fill="url(#bg2)"/>
-    </svg><div class="idle-icon"><svg viewBox="0 0 140 140" width="190" height="190" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 22h22l18 74h66"/><circle cx="58" cy="124" r="13"/><rect x="52" y="8" width="78" height="64" rx="12"/><path d="M72 26v28M82 24v30M92 24v30M102 26v28M112 28v24" stroke-width="7"/></svg></div><h1>Welcome!</h1><p class="lead">Scan or place your products to begin checkout.</p><button class="tag-pill" id="btn-idle-tag" type="button">Input Tag</button></div>
+    </svg><div class="idle-icon"><svg viewBox="0 0 140 140" width="190" height="190" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 22h22l18 74h66"/><circle cx="58" cy="124" r="13"/><rect x="52" y="8" width="78" height="64" rx="12"/><path d="M72 26v28M82 24v30M92 24v30M102 26v28M112 28v24" stroke-width="7"/></svg></div><h1>Welcome!</h1><p class="lead">Scan or place your products to begin checkout.</p><button class="tag-pill" id="btn-idle-tag" type="button">Input Tag</button><button class="tag-pill" id="btn-rescan-idle" type="button" hidden>Rescan products</button></div>
 
   <div class="screen" id="k-cart">
     <div class="cart-top">
@@ -52,6 +52,7 @@
       <div class="cart-actions">
         <button class="cbtn confirm" id="btn-checkout" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5l5.5 5.5L20.5 6.5"/></svg>Checkout</button>
         <button class="cbtn outline" id="btn-input-tag-toggle" type="button">INPUT TAG</button>
+        <button class="cbtn outline" id="btn-rescan-cart" type="button" hidden>Rescan products</button>
         <button class="cbtn outline" id="btn-cancel" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>Cancel Order</button>
       </div>
     </div>
@@ -171,8 +172,8 @@
 <script src="../js/auth.js?v=integration-20261025"></script>
 <script src="../js/qr-payment.js?v=integration-20261025"></script>
 <script src="../js/camera-scanner.js?v=integration-20261025"></script>
-<script src="../assets/js/rfid-scanner.js?v=modifier-guard-20261025"></script>
-<script src="../js/kiosk.js?v=modifier-guard-20261025"></script>
+<script src="../assets/js/rfid-scanner.js?v=rescan-20261026"></script>
+<script src="../js/kiosk.js?v=rescan-20261026"></script>
 <script src="../js/main.js?v=integration-20261025"></script>
 </body>
 </html>

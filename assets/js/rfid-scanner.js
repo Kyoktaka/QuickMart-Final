@@ -47,6 +47,8 @@
     // item) the reader is blocked: its output is swallowed and never registered.
     if(!valid(epc)||!enabled||blocked)return false;
     const now=performance.now(),old=present.get(epc);
+    const previousReadAt=old?.lastSeen??null;
+    const previousCycleMs=Math.max(old?.interval||0,estimatedCycle(now));
     if(old){
       const gap=now-old.lastSeen;
       if(gap>=100&&gap<=30000)old.interval=old.interval===null?gap:(old.interval*.6+gap*.4);
@@ -58,7 +60,7 @@
       window.dispatchEvent(new CustomEvent('rfid:epc',{detail:epc}));
     }
     lastReadAt=now;
-    window.dispatchEvent(new CustomEvent('rfid:read',{detail:{epc,at:now}}));
+    window.dispatchEvent(new CustomEvent('rfid:read',{detail:{epc,at:now,previousReadAt,previousCycleMs}}));
     return true;
   }
   function flush(){
@@ -231,6 +233,7 @@
     enable:()=>setEnabled(true),disable:()=>setEnabled(false),setEnabled,
     setBlocked,isBlocked:()=>blocked,
     isEnabled:()=>enabled,isBridgeOnline:()=>bridgeOnline,getPresentEpcs:list,
+    getLastReadAt:epc=>present.get(normalize(epc))?.lastSeen??null,
     configureBridge,disconnectBridge,
     // A capture pause releases queue ownership, not the bridge's USB interface.
     // Last verified health is explicit; paused state is never labelled live-connected.

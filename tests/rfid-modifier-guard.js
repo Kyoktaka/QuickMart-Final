@@ -65,6 +65,14 @@ function setup(){
           fire('input',element,insertion);
         }
       }
+    }else if(!event.defaultPrevented&&(key==='Backspace'||key==='Delete')&&
+       ['INPUT','TEXTAREA'].includes(element.tagName)&&!element.readOnly){
+      const deletion={inputType:key==='Backspace'?'deleteContentBackward':'deleteContentForward',data:null};
+      if(!fire('beforeinput',element,deletion).defaultPrevented){
+        let start=element.selectionStart,end=element.selectionEnd;
+        if(start===end){if(key==='Backspace')start=Math.max(0,start-1);else end=Math.min(element.value.length,end+1)}
+        element.setRangeText('',start,end);fire('input',element,deletion);
+      }
     }
     if(!properties.keepHeld)fire('keyup',element,details);
     return event;

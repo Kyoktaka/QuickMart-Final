@@ -4,8 +4,8 @@
      even if the (unstable) reader stops seeing the tag.
    - An item leaves the cart only when the customer removes it, cancels the order,
      or the payment completes.
-   - While a popup is open (Input Tag, Check your cart, Remove item) the reader is
-     blocked, so scanner output can never be typed into a field or added to the cart. */
+   - Popups pause cart capture. The shared timing guard filters recognizable
+     keyboard-wedge frames; physical reader isolation requires supported hardware access. */
 let timerId=null,left=TIMEOUT,trayRevision=0,blockedTimer=null,retryTimer=null,retryCount=0;
 let detectDebounce=null,detectInFlight=false,latestSnapshot=[],removeTarget=null,removeCount=1;
 const loggedSessions=new Set(),blockedShownAt=new Map();
@@ -13,7 +13,8 @@ const latchedEpcs=new Set();      // every EPC in (or waiting to join) the cart
 const removedEpcs=new Map();      // EPC -> time it was last seen missing (null = still being read)
 const rejectedEpcs=new Set();     // unknown / inactive EPCs, ignored until the session resets
 const absentEpcs=new Set();       // explicit reader expiry, distinct from a cleared or paused snapshot
-const removedReadAt=new Map();    // removed EPC -> time of its latest read, to spot a lift-off and re-present
+const removedReadAt=new Map();    // removed EPC -> last read in the scanner's monotonic clock
+const rescanEpcs=new Set();       // explicit release awaiting a fresh, backend-validated read
 const REARM_GAP_MS=1500;
 // A removed tag is re-armed on an actual reader absence event, without a second fixed waiting period.
 const CHECKOUT_STORAGE='qm_checkout';
@@ -189,6 +190,9 @@ function renderCart(){
   if(renderCart.last!==html){renderCart.last=html;$('#cart-body').innerHTML=html}
   $('#sum-items').textContent=cartQty();$('#sum-tax').textContent=peso(0);
   $('#sum-total').textContent=peso(cartTotal());$('#qr-total').textContent=peso(cartTotal());
+  for(const id of ['btn-rescan-idle','btn-rescan-cart']){
+    const button=$('#'+id);if(button){button.hidden=!removedEpcs.size;button.disabled=Boolean(state.processing)}
+  }
   if($('#m-confirm').classList.contains('on'))drawConfirm();
 }
 function drawTimer(){$('#qr-timer').textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0')}
@@ -223,16 +227,23 @@ async function finalize(status,reason){
 
 /* ---------- reset helpers ---------- */
 function clearCartMemory(){
-  latchedEpcs.clear();removedEpcs.clear();removedReadAt.clear();rejectedEpcs.clear();blockedShownAt.clear();
+  latchedEpcs.clear();removedEpcs.clear();removedReadAt.clear();rescanEpcs.clear();rejectedEpcs.clear();blockedShownAt.clear();
   clearTimeout(retryTimer);retryTimer=null;retryCount=0;
 }
 // Cancelled items may still be lying on the reader; keep them out until they are really gone.
-function holdCurrentTags(){for(const epc of latchedEpcs){removedEpcs.set(epc,null);removedReadAt.delete(epc)}}
+function suppressEpc(epc){
+  removedEpcs.set(epc,null);
+  const at=RFIDScanner.getLastReadAt?.(epc);
+  if(typeof at==='number')removedReadAt.set(epc,at);else removedReadAt.delete(epc);
+}
+function holdCurrentTags(){for(const epc of latchedEpcs)suppressEpc(epc)}
 function resetKiosk(keepHeld=false,forgetSaved=true){
   const held=keepHeld?new Map(removedEpcs):null;
+  const heldReads=keepHeld?new Map(removedReadAt):null;
   clearTimeout(detectDebounce);detectDebounce=null;
   latestSnapshot=[];clearTimeout(blockedTimer);stopTimer();stopCameraScanner();trayRevision++;
   clearCartMemory();if(held)for(const [epc,seen] of held)removedEpcs.set(epc,seen);
+  if(heldReads)for(const [epc,at] of heldReads)removedReadAt.set(epc,at);
   state.cart=[];state.current=null;state.processing=false;removeTarget=null;
   checkoutSession=null;state.checkout=null;reviewedRevision=null;navigationProtected=false;
   if(forgetSaved){if(keepHeld&&removedEpcs.size)rememberCart();else sessionStorage.removeItem(CHECKOUT_STORAGE)}
@@ -267,6 +278,7 @@ function absorbEpcs(list){
   for(const raw of list){
     const epc=normEpc(raw);
     if(!epc||latchedEpcs.has(epc)||removedEpcs.has(epc)||rejectedEpcs.has(epc))continue;
+    rescanEpcs.delete(epc);
     latchedEpcs.add(epc);grew=true;
   }
   return grew;
@@ -278,20 +290,39 @@ function releaseRemoved(epc){
   if(typeof RFIDScanner.isBlocked==='function'&&RFIDScanner.isBlocked())return;
   removedEpcs.delete(normEpc(epc));removedReadAt.delete(normEpc(epc));rememberCart();
 }
-// A removed tag read again after a gap was lifted off the reader and presented again: the
-// customer changed their mind, so add it now instead of waiting for the absence timeout.
-// The first read after removal only sets the baseline.
+// Use the cadence from BEFORE this read: feeding its return gap into the
+// estimator first can raise the release threshold above the gap being tested.
 window.addEventListener('rfid:read',event=>{
   const epc=normEpc(event.detail?.epc),at=event.detail?.at;
-  if(!epc||!removedEpcs.has(epc)||typeof at!=='number')return;
+  if(!epc||typeof at!=='number')return;
   if(!state.kioskOn||!RFIDScanner.isEnabled()||(RFIDScanner.isBlocked?.()))return;
-  const previous=removedReadAt.get(epc);removedReadAt.set(epc,at);
+  if(!$('#k-idle').classList.contains('on')&&!$('#k-cart').classList.contains('on'))return;
+  // Explicit Rescan makes the next fresh read eligible, including tags still
+  // in the presence map. Existing cart EPCs remain deduplicated.
+  if(!removedEpcs.has(epc)){
+    if(rescanEpcs.delete(epc))queueTray([epc]);
+    return;
+  }
+  const previous=typeof event.detail.previousReadAt==='number'?event.detail.previousReadAt:removedReadAt.get(epc);
+  removedReadAt.set(epc,at);
   if(previous===undefined)return;
-  const cycle=RFIDScanner.getReadHealth?.().estimatedInventoryCycleMs||0;
-  if(at-previous<Math.max(REARM_GAP_MS,cycle*3))return;
+  // A first sighting has no measured cadence. Wait for evidence or an explicit
+  // Rescan rather than mistaking its first normal repeat for physical removal.
+  if(event.detail.previousCycleMs===0)return;
+  const cycle=Math.max(0,Number(event.detail.previousCycleMs)||0);
+  const gapRequired=Math.max(REARM_GAP_MS,cycle+Math.max(500,cycle*.25));
+  if(at-previous<gapRequired)return;
   removedEpcs.delete(epc);removedReadAt.delete(epc);rememberCart();
   queueTray([epc]);
 });
+function rescanProducts(){
+  if(!state.kioskOn||state.processing||!removedEpcs.size||!RFIDScanner.isEnabled()||RFIDScanner.isBlocked?.())return;
+  if(!$('#k-idle').classList.contains('on')&&!$('#k-cart').classList.contains('on'))return;
+  for(const epc of removedEpcs.keys())rescanEpcs.add(epc);
+  removedEpcs.clear();removedReadAt.clear();rememberCart();renderCart();bumpIdle();
+  toast('Ready to scan removed products again.');
+}
+for(const id of ['btn-rescan-idle','btn-rescan-cart'])if($('#'+id))$('#'+id).onclick=rescanProducts;
 window.addEventListener('rfid:absent',event=>{
   const epc=normEpc(event.detail?.epc);if(epc)absentEpcs.add(epc);
   releaseRemoved(epc);if(state.kioskOn)renderCart();
@@ -383,7 +414,7 @@ function removeFromCart(productId,count){
   const item=state.cart.find(i=>i.id===productId);if(!item)return false;
   const n=Math.max(1,Math.min(Math.floor(Number(count))||1,item.scanned.length));
   const gone=item.scanned.slice(item.scanned.length-n);
-  for(const epc of gone){latchedEpcs.delete(epc);removedReadAt.delete(epc);if(!absentEpcs.has(epc))removedEpcs.set(epc,null)}
+  for(const epc of gone){latchedEpcs.delete(epc);if(!absentEpcs.has(epc))suppressEpc(epc)}
   item.scanned=item.scanned.slice(0,item.scanned.length-n);item.qty=item.scanned.length;
   if(!item.qty)state.cart=state.cart.filter(i=>i!==item);
   renderCart();
