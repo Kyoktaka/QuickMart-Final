@@ -53,8 +53,8 @@ function scan(target,epc){
 }
 scanner.enable();
 const search=input('milk ');
-for(const char of 'James2026')assert.equal(press(search,char,7).defaultPrevented,char==='e',
-  'Only the lowercase EPC prefix candidate is briefly buffered');
+for(const char of 'James2026')press(search,char,7);
+advance(100);
 assert.equal(search.value,'milk James2026','Narrow prefix replay preserves the exact ordinary typing');
 const before=search.value;
 assert.equal(scan(search,'E28011700000021905AC150B').defaultPrevented,true,

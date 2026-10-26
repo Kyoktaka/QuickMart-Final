@@ -6,11 +6,11 @@
      and the reader's closing Enter is swallowed (cannot submit the form or use a password attempt)
    - nothing focused / a button focused (Logout, Cancel, ...): recognized reader characters and its closing Enter
      are swallowed, so a recognized burst cannot click a button; slow or unsupported frames remain ambiguous
-   Paste and Tab retain native behavior. Editing keys and non-hex text during a strong
+   Paste and Tab retain native behavior. Editing keys and non-hex text during a pending
    reader candidate are deferred until it resolves, then applied to the clean field.
    Ordinary typing outside a reader candidate passes through immediately.
    E/e/3 prefix candidates are the narrow exception: their original text may wait up to 90 ms after
-   the last candidate key, or until the next non-candidate/editing key resolves the prefix.
+   the last candidate key. Deferred edits retain their order when that text is manual input.
    The fallback recognizes long, fast hexadecimal EPC bursts, not the physical USB device:
    sufficiently fast hexadecimal typing remains ambiguous, and slow/non-hex reader output may leak.
    Only a verified independent raw-USB interface can separate the devices reliably.
@@ -62,7 +62,9 @@
     timer=null;
     const left=deadline-Date.now();
     if(left>2){timer=setTimeout(onEnd,left);return}
-    epcDropping=false;endBurst(true);
+    // Release deferred human edits now, but retain the identified frame's
+    // separate closing-Enter window through EPC_FRAME_END_MS.
+    endBurst(true);
   }
   function endBurst(refocus){
     clearTimeout(timer);timer=null;burst=false;fast=0;slow=0;
@@ -92,46 +94,53 @@
   const writable=el=>Boolean(el&&['INPUT','TEXTAREA'].includes(el.tagName)&&
     !el.disabled&&!el.readOnly&&isField(el));
   let deferredEdits=[];
+  function replaceRange(el,text,start,end){
+    try{el.setRangeText(text,start,end,'end')}
+    catch(_){
+      el.value=el.value.slice(0,start)+text+el.value.slice(end);
+      try{el.setSelectionRange(start+text.length,start+text.length)}catch(_){}
+    }
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  function applyEdit({el,key}){
+    if(!writable(el)||el.isConnected===false)return;
+    let start=el.selectionStart,end=el.selectionEnd;
+    if(typeof start!=='number'||typeof end!=='number')start=end=String(el.value??'').length;
+    let text=key;
+    if(key==='Backspace'||key==='Delete'){
+      text='';
+      if(start===end){
+        if(key==='Backspace')start=Math.max(0,start-1);
+        else end=Math.min(el.value.length,end+1);
+      }
+    }
+    replaceRange(el,text,start,end);
+  }
   function replayEdits(){
     const edits=deferredEdits;deferredEdits=[];
-    for(const {el,key} of edits){
-      if(!writable(el)||el.isConnected===false)continue;
-      let start=el.selectionStart,end=el.selectionEnd;
-      if(typeof start!=='number'||typeof end!=='number')start=end=String(el.value??'').length;
-      let text=key;
-      if(key==='Backspace'||key==='Delete'){
-        text='';
-        if(start===end){
-          if(key==='Backspace')start=Math.max(0,start-1);
-          else end=Math.min(el.value.length,end+1);
-        }
-      }
-      try{el.setRangeText(text,start,end,'end')}
-      catch(_){el.value=el.value.slice(0,start)+text+el.value.slice(end)}
-      el.dispatchEvent(new Event('input',{bubbles:true}));
-    }
+    edits.forEach(applyEdit);
   }
   function replayPending(){
     const p=epcPending;epcPending=null;
     if(!p||!writable(p.el))return;
     const el=p.el,old=String(el.value??'');
-    const start=Math.min(p.start,old.length),end=Math.min(Math.max(start,p.end),old.length);
+    let start=Math.min(p.start,old.length),end=Math.min(Math.max(start,p.end),old.length);
     // If a USB pause expires the prefix buffer, the fallback must still know
     // the value before that prefix. Otherwise its later rollback leaves the
     // replayed first 1-3 reader characters behind.
     // Prefix keys already advance the shared candidate while held. Replaying
     // them must not reset that candidate or its original rollback baseline.
-    try{
-      if(typeof el.setRangeText==='function')el.setRangeText(p.chars,start,end,'end');
-      else{
-        el.value=old.slice(0,start)+p.chars+old.slice(end);
-        if(el.setSelectionRange)el.setSelectionRange(start+p.chars.length,start+p.chars.length);
-      }
-    }catch(_){
-      // Number and other non-selectable input types do not support setRangeText.
-      el.value=old.slice(0,start)+p.chars+old.slice(end);
+    const edits=p.edits||[],held=new Set(edits.map(entry=>entry.edit));
+    deferredEdits=deferredEdits.filter(edit=>!held.has(edit));
+    let offset=0;
+    for(const entry of edits){
+      const at=Math.min(entry.offset,p.chars.length);
+      replaceRange(el,p.chars.slice(offset,at),start,end);
+      applyEdit(entry.edit);offset=at;
+      start=typeof el.selectionStart==='number'?el.selectionStart:el.value.length;
+      end=typeof el.selectionEnd==='number'?el.selectionEnd:start;
     }
-    try{el.dispatchEvent(new Event('input',{bubbles:true}))}catch(_){}
+    if(offset<p.chars.length)replaceRange(el,p.chars.slice(offset),start,end);
   }
   function pendingExpiry(){
     epcPendingTimer=null;
@@ -177,21 +186,26 @@
     // toggle without flushing the pending prefix or releasing a rejected frame.
     if(e.key==='Shift'||e.key==='CapsLock')return;
     const now=Date.now(),el=e.target,key=e.key,scan=scanChar(e),hex=Boolean(scan);
-    if(closingEnter&&(now-closingEnterAt>ENTER_AFTER_MS||key!=='Enter'))closingEnter=false;
-    if(closingEnter&&key==='Enter'&&e.repeat&&!readerOpen(el)){swallow(e);return}
-    if(readerOpen(el)||e.ctrlKey||e.metaKey||e.altKey||(e.repeat&&!readerRepeat(e,now,scan))||e.isComposing||e.keyCode===229){
-      flushPending();epcDropping=false;return;
-    }
-    // Editing during a recognized/strong candidate must not split the RFID
-    // frame. Hold the person's edit until the frame ends; replay it against
-    // the clean value, or after the candidate text if it was ordinary typing.
     const edit=key==='Backspace'||key==='Delete'||
       (typeof key==='string'&&key.length===1&&!hex);
-    const activeFrame=(epcPending?.el===el&&epcPending.chars.length>=4&&now-epcPending.at<=EPC_FRAME_GAP_MS)||
+    const activeFrame=(epcPending?.el===el&&now-epcPending.at<=EPC_FRAME_GAP_MS)||
       (epcDropping&&epcDropEl===el&&now-epcDropAt<=BURST_HOLD_GAP_MS)||
       (burst&&beforeEl===el&&now-lastScanKey<=BURST_HOLD_GAP_MS);
+    if(closingEnter&&(now-closingEnterAt>ENTER_AFTER_MS||key!=='Enter'))closingEnter=false;
+    if(closingEnter&&key==='Enter'&&e.repeat&&!readerOpen(el)){swallow(e);return}
+    if(readerOpen(el)||e.ctrlKey||e.metaKey||e.altKey||
+       (e.repeat&&!readerRepeat(e,now,scan)&&!(edit&&activeFrame&&writable(el)))||e.isComposing||e.keyCode===229){
+      flushPending();epcDropping=false;return;
+    }
+    // Even the first 1-3 buffered keys may be an RFID prefix. Do not replay
+    // them into the field merely because a person presses Backspace/Delete.
+    // Editing during a pending candidate must not split the RFID
+    // frame. Hold the person's edit until the frame ends; replay it against
+    // the clean value, or after the candidate text if it was ordinary typing.
     if(edit&&activeFrame&&writable(el)){
-      deferredEdits.push({el,key});swallow(e);return;
+      const edit={el,key};deferredEdits.push(edit);
+      if(epcPending?.el===el)(epcPending.edits??=[]).push({offset:epcPending.chars.length,edit});
+      swallow(e);return;
     }
     if(burst)return;
     if(epcDropping&&el!==epcDropEl)epcDropping=false;
