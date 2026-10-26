@@ -93,8 +93,8 @@ async function main(){
   {
     const h=setup();await h.warmup(3000);await h.remove();
     await h.readAt(11000);await h.advance(180);
-    check(h.reads.at(-1).previousCycleMs,1000,'Returning read carries the pre-gap inventory cycle');
-    check(h.scanner.getReadHealth().estimatedInventoryCycleMs,3400,'Actual estimator includes the new gap after its snapshot');
+    check(h.reads.at(-1).previousCycleMs,3000,'Returning read carries the 3000 ms pre-gap inventory cycle');
+    check(h.scanner.getReadHealth().estimatedInventoryCycleMs,3440,'Actual estimator includes the 4100 ms returning gap only after the snapshot');
     check(h.state.cart[0]?.qty,1,'A four-second return no longer inflates its own release threshold');
   }
   {
